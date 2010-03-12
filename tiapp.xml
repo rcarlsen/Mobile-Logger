@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ti:app xmlns:ti="http://ti.appcelerator.org">
+<id>com.robertcarlsen.Dashboard</id>
+<name>Dashboard</name>
+<version>1.0</version>
+<publisher>rcarlsen</publisher>
+<url>robertcarlsen.net</url>
+<description>No description provided</description>
+<copyright>2010 by rcarlsen</copyright>
+<icon>appicon.png</icon>
+    <persistent-wifi>false</persistent-wifi>
+    <prerendered-icon>false</prerendered-icon>
+    <statusbar-style>default</statusbar-style>
+    <statusbar-hidden>false</statusbar-hidden>
+    <analytics>true</analytics>
+<guid>ec3286a4-55c7-4659-bb3a-3a4b07e359f2</guid>
+</ti:app>
