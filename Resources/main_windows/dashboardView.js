@@ -9,8 +9,7 @@ var loggingState = false;
 
 var dashboardView = Ti.UI.createView({
     size:{width:320,height:win1.getHeight()},
-    top:0,
-    left:0
+    top:0,bottom:0
 });
 
 
@@ -30,13 +29,19 @@ var loggingSwitch = Titanium.UI.createSwitch({
 });
 
 var loggingLabel = Ti.UI.createLabel({
-    top:10,right:10+100, //different for android?
+    top:10,
     height:'auto',
     textAlign:'right',
     text:'Logging Active:',
     color:'#333',
 	font:{fontSize:16,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
+if(Ti.Platform.name == 'iPhone OS'){
+    loggingLabel.right = 10+100;
+} else {
+    loggingLabel.right = 10+60;
+}
+
 
 var accLabel = Ti.UI.createLabel({
     height:'auto',
@@ -56,8 +61,7 @@ var speedlabel = Titanium.UI.createLabel({
 	font:{fontSize:72,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:120,
-    left:0
+    top:120
 });
 
 var speedUnitLabel = Ti.UI.createLabel({
@@ -66,7 +70,6 @@ var speedUnitLabel = Ti.UI.createLabel({
     textAlign:'center',
     height:'auto',
     top:200,
-    left:0,
     text:'MPH'
 });
 
@@ -77,19 +80,22 @@ var headingLabel = Ti.UI.createLabel({
     textAlign:'center',
     height:'auto',
     top:75,
-    left:0,
     text:'000\u00B0' // this is the degree symbol
 });
-
+var headingAccuracyLabel = Ti.UI.createLabel({
+    color:'#333',
+    font:{fontSize:12,fontFamily:'Helvetica Neue'},
+    textAlign:'center',
+    height:'auto',
+    top:95
+});
 
 var distanceLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:240,
-    left:0,
-    text:'0 Miles'
+    top:240
 });
 
 //// Testing to see if the canvas view exists
@@ -101,7 +107,7 @@ var distanceLabel = Ti.UI.createLabel({
 
 var compass = Ti.UI.createImageView({
     url: '../images/compass.png',
-    width:272,height:272,
+    width:278,height:278,
     center:{x:160,y:180} // i think that x and y are transposed
 });
 
@@ -117,9 +123,14 @@ function startLogging() {
     // open the database connection (create if necessary)
     logDB = Ti.Database.open("log.db");
     logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+    logDB.close();
 
+    // this isn't working for android
     // generate an eventID:
-    eventID = Titanium.Platform.createUUID();
+    //eventID = Titanium.Platform.createUUID();
+
+    eventID = Titanium.Utils.md5HexDigest(new Date().toUTCString());
+
 
     // clear the current sample
     //currentSample = new Object;
@@ -137,7 +148,6 @@ function stopLogging() {
     clearInterval(loggingInterval);
     loggingInterval = 0;
 
-    logDB.close();
    
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
@@ -148,9 +158,22 @@ function recordSample() {
     currentSample.timestamp = new Date().getTime();
 
     Titanium.API.info("Current sample recorded to db");
-    Titanium.API.info(currentSample);
+    Titanium.API.info(currentSample.toString());
 
+    logDB = Ti.Database.open("log.db");
     logDB.execute('INSERT INTO LOGDATA VALUES(NULL,?,?)',eventID,JSON.stringify(currentSample));
+    logDB.close();
+
+//  this is neat, but it messes up the rotation animation
+//  the heartbeat animation would be great for another widget.
+//	// animate compass
+//	var t = Titanium.UI.create2DMatrix();
+//	t = t.scale(1.1);
+//	compass.animate({transform:t, duration:100},function()
+//	{
+//		var t = Titanium.UI.create2DMatrix();
+//		compass.animate({transform:t, duration:200});
+//	});
 };
 // end logging methods//
 
@@ -196,7 +219,7 @@ loggingSwitch.addEventListener('change',function(e) {
         alertDialog.show();   
         // TODO: any post logging cleanup
 
-    } else {
+    } else if(loggingState==false) { // don't start a new log if we're already logging
         Titanium.API.info("Logging switch activated");
 
         loggingState = true;
@@ -240,7 +263,10 @@ dashboardView.add(compass);
 
 dashboardView.add(speedlabel);
 dashboardView.add(speedUnitLabel);
+
 dashboardView.add(headingLabel);
+dashboardView.add(headingAccuracyLabel);
+
 dashboardView.add(distanceLabel);
 dashboardView.add(accLabel);
 
@@ -261,12 +287,15 @@ function updateDistanceLabel(distance) {
 
 function rotateCompass(degrees) {
 // cloud 1 animation/transform
-	var t = Ti.UI.create2DMatrix();
+	// don't interrupt the current animation
+    if(compass.animating) {return;}
+    
+    var t = Ti.UI.create2DMatrix();
 	t = t.rotate(360-parseFloat(degrees));
 
 	var a = Titanium.UI.createAnimation();
 	a.transform = t;
-	a.duration = 0;
+	a.duration = 100;
 	a.autoreverse = false;
 	//a.repeat = 0;
 	compass.animate(a); // TODO: rotate a compass widget instead
@@ -317,7 +346,7 @@ else
 			var accuracy = e.heading.accuracy;
 			var trueHeading = e.heading.trueHeading;
 			var timestamp = e.heading.timestamp;
-			
+
             updateHeadingLabel(trueHeading);
             rotateCompass(trueHeading);
 
@@ -355,7 +384,12 @@ else
 //				updatedHeadingTime.color = '#444';
 //				
 //			},100);
-			
+	        
+            // if the accuracy is negative, then the heading is invalid
+            // change the display to indicate this.
+            // Color the heading label differently?
+            
+            headingAccuracyLabel.text = accuracy;
             updateHeadingLabel(trueHeading);
             rotateCompass(trueHeading);
 
@@ -480,15 +514,30 @@ else
 // methods for the accelerometer
 Titanium.Accelerometer.addEventListener('update',function(e)
 {
-    var msg = "accelerometer - x:"+e.x.toFixed(2)+",y:"+e.y.toFixed(2)+",z:"+e.z.toFixed(2); 
+    var acc = [e.x,e.y,e.z];
+
+    // the android (G1) seems to report acceleration in m/s2
+    // the iPhone reports this in g forces
+    // 1g = -9.8m/s2
+    if(Ti.Platform.name == 'android'){
+        for(var i in acc){
+            acc[i] = acc[i] / -9.8;
+        }
+        //acc = div(acc,-9.8);
+    };
+
+    var msg = "accelerometer - x:"+acc[0].toFixed(2)+",y:"+acc[1].toFixed(2)+",z:"+acc[2].toFixed(2); 
     accLabel.text = msg;
 
     // add the readings to the current sample:
     var precision = 3;
-    currentSample.accx = parseFloat(e.x.toFixed(precision));
-    currentSample.accy = parseFloat(e.y.toFixed(precision));
-    currentSample.accz = parseFloat(e.z.toFixed(precision));
+    currentSample.accx = parseFloat(acc[0].toFixed(precision));
+    currentSample.accy = parseFloat(acc[1].toFixed(precision));
+    currentSample.accz = parseFloat(acc[2].toFixed(precision));
 
+    // TODO: big movements trigger an immediate recording
+    // will this be instantaenous or will a historcal trend need to be recorded?
+    // maybe calculate the magnitude of the vector of all three axes.
 });
 
 
