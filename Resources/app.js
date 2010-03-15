@@ -43,6 +43,7 @@ var tab2 = Titanium.UI.createTab({
 // Settings Tab 
 //
 var winSettings = Titanium.UI.createWindow({  
+    url:'main_windows/settings.js',
     title:'Settings',
     backgroundColor:'#ccc',
     barColor:greenColor

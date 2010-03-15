@@ -158,7 +158,7 @@ function recordSample() {
     currentSample.timestamp = new Date().getTime();
 
     Titanium.API.info("Current sample recorded to db");
-    Titanium.API.info(currentSample.toString());
+    Titanium.API.info('Time: '+currentSample.timestamp);
 
     logDB = Ti.Database.open("log.db");
     logDB.execute('INSERT INTO LOGDATA VALUES(NULL,?,?)',eventID,JSON.stringify(currentSample));

@@ -12,12 +12,13 @@ var b = Titanium.UI.createButton();
 
 // use special button icon if on iPhone
 if(Ti.Platform.name == 'iPhone OS'){
-    b.systemButton = Titanium.UI.iPhone.SystemButton.ACTION    
+    b.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
 } else {
     b.title = 'Send';
 }
 
-b.addEventListener('click',function(){
+
+function sendLog(){
     // TODO: invoke an action sheet with options for sending the data
     // at the moment, just back to emailing off an attachment
 
@@ -90,7 +91,10 @@ b.addEventListener('click',function(){
     });
     emailView.open();
 
-});
+};
+
+
+//b.addEventListener('click',sendLog());
 
 if(Ti.Platform.name == 'iPhone OS'){
     win.rightNavButton = b;
@@ -100,6 +104,8 @@ if(Ti.Platform.name == 'iPhone OS'){
     // Menu?
 }
 
+// this isn't being used at the moment
+// TODO: add an activity meter.
 var data = [
 	{title:'Log file loading...'}
 ];
@@ -116,17 +122,65 @@ logTable.addEventListener('click',function(e)
     // because the android doesn't have a navbar with buttons,
     // use the options dialog (action sheet) to reveal
     // log inspection and upload functions
-    var dialog = Titanium.UI.createOptionDialog({
+    var optionsDialog = Titanium.UI.createOptionDialog({
         options:['Inspect data', 'Email Log', 'Delete Log', 'Cancel'],
         destructive:2,
         cancel:3,
         title:'Manage Log'
     });
+
+
     // TODO: add a listener to conditionally act on the response.
     // This may be better suited to display differently based on each platform's
     // UX paradigms.
+    optionsDialog.addEventListener('click',function(oe){
+        // these properties aren't being provided correctly.
+        if(oe.cancel == true) { 
+            Ti.API.info('Cancel button pressed');
+            return; 
+        }
+        if(oe.destructive == true) {
+            // delete this log file
+            // forward the event to the delete listener
+            Ti.API.info('Delete Log button pressed.');
+            logTable.fireEvent('delete',e);
+            Ti.API.info('fired a synthesized delete event to logTable');
+        } else {
+            switch(oe.index) {
+                case 0:
+                    Ti.API.info('Button 0 pressed.');
+                    // Inspect this log data 
+                    displayDetail();
+                    break;
+                case 1:
+                    Ti.API.info('Button 1 pressed.');
+                    // email / upload this log
+                    toggleSelection(true);
+                    sendLog();
+                    toggleSelection(false);
+                    break;
+                case 2:
+                    // delete this log file
+                    // forward the event to the delete listener
+                    Ti.API.info('Delete Log button pressed for event: '+e.row.eventID);
+                    deleteEvent(e.row.eventID);
+                    break;
+                case 3:
+                    Ti.API.info('Cancel button pressed');
+                    break;
 
-    if(e.detail){ // only do this if the detail icon was clicked
+                default:
+                    Ti.API.info('Default case in options dialog.');
+                    // this shouldn't happen
+                    return;
+            }
+        }
+
+    });
+    Ti.API.info('Showing the options dialog');
+    optionsDialog.show();
+
+   function displayDetail() { 
         var newwin = Titanium.UI.createWindow({
 			title:'Data Sample',
             backgroundColor:'#ddd'
@@ -148,13 +202,15 @@ logTable.addEventListener('click',function(e)
         newwin.add(sample);
 
 		Titanium.UI.currentTab.open(newwin,{animated:true});
-    } else {
+   }
+    
+    function toggleSelection(force) {
         // toggle the checked status of this row
-       if(e.row.hasCheck == null || e.row.hasCheck == false) {
+       if(force === true || (e.row.hasCheck == null || e.row.hasCheck == false)) {
            var data = e.row;
            //logTable.updateRow(e.index,data);
             data.hasCheck = true;
-            data.hasDetail = false;
+            //data.hasDetail = false;
 
             var evt = data.eventID;
             selectedEvents.push(evt);
@@ -162,7 +218,7 @@ logTable.addEventListener('click',function(e)
             Ti.API.info('row '+e.index+' selected. ('+data.eventID+')');
        } else {
            var data = e.row;
-           data.hasDetail = true;
+           //data.hasDetail = true;
            data.hasCheck = false;
            //logTable.updateRow(e.index,data);
            
@@ -176,6 +232,7 @@ logTable.addEventListener('click',function(e)
            };
        }
     }
+
 });
 
 // add delete event listener
@@ -184,6 +241,12 @@ logTable.addEventListener('delete',function(e)
     // get the selected row's eventID
     var eventID = e.row.eventID;
     if (eventID == null ) {return;}
+
+    deleteEvent(eventID);
+});
+
+function deleteEvent(eventID) {
+    if(eventID == null) { return; }
 
     // remove the log data from the db
     // but first confirm with an alert
@@ -213,12 +276,21 @@ logTable.addEventListener('delete',function(e)
 
     alertDialog.show();
 
-});
+};
 
 
 
 // call up the log list from the database
 function loadLogs () {
+    // display the activity indicator 
+    var actInd = Titanium.UI.createActivityIndicator();
+    if(Ti.Platform.name == 'iPhone OS') {
+        actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
+    }
+
+    actInd.show();
+        
+    
     // open the database connection (create if necessary)
     var logDB = Ti.Database.open("log.db");
 
@@ -252,7 +324,7 @@ function loadLogs () {
                 selectedEvents.push(rowParams.eventID); // restore this selection
             } else {
                 Ti.API.info('Found unselected event');
-                rowParams.hasDetail = true;
+                //rowParams.hasDetail = true;
             }
             tmpData.push(rowParams);
             rows.next();
@@ -284,6 +356,9 @@ function loadLogs () {
         logTable.data = tmpData;
         win.add(logTable);
     }
+
+    // hide the activity indicator
+    actInd.hide();
 }
 
 // reload the logs when the window gains focus
