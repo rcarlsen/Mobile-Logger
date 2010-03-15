@@ -12,9 +12,10 @@ tabGroup.backgroundColor=greenColor;
 //
 var win1 = Titanium.UI.createWindow({  
     url:'main_windows/dashboardView.js',
-    title:'Dashboard',
-    backgroundColor:'#aaa',
-    barColor:greenColor
+    // title:'Dashboard',
+    backgroundColor:'#ccc',
+    navBarHidden:true
+// barColor:greenColor
 });
 var tab1 = Titanium.UI.createTab({  
     icon:'KS_nav_views.png',

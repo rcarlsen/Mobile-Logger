@@ -1,11 +1,23 @@
+// include files
 Ti.include('../tools/json2.js');
 
+// reference the parent window
 var win1 = Ti.UI.currentWindow;
 
-var loggingState = false; 
-// toggle this when recording
+// set up some instance vars:
+var loggingState = false; // toggle this when recording
 // should this be a property, or something not tied to this class?
 
+var eventID;
+var currentSample = new Object;
+var loggingInterval = 0;
+var logDB;
+
+var eventStartDate;
+var clockInterval = 0;
+
+var distanceUnits = "Mi";
+// end instance vars //
 
 var dashboardView = Ti.UI.createView({
     size:{width:320,height:win1.getHeight()},
@@ -24,32 +36,34 @@ var dashboardView = Ti.UI.createView({
 
 // toggle switch for enabling logging
 var loggingSwitch = Titanium.UI.createSwitch({
-    top:10,right:10,
+    top:40,right:10,
     value:false
 });
 
 var loggingLabel = Ti.UI.createLabel({
     top:10,
+    right:10,
     height:'auto',
     textAlign:'right',
     text:'Logging Active:',
     color:'#333',
 	font:{fontSize:16,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
-if(Ti.Platform.name == 'iPhone OS'){
+
+/*if(Ti.Platform.name == 'iPhone OS'){
     loggingLabel.right = 10+100;
 } else {
     loggingLabel.right = 10+60;
-}
+}*/
 
 
 var accLabel = Ti.UI.createLabel({
     height:'auto',
-    bottom:10,
+    top:10,
     left:10,
     textAlign:'left',
     color:'#333',
-	font:{fontSize:12,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+	font:{fontSize:10,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
 
 // using text in the canvas doesn't seem supported at the moment on mobile safari
@@ -58,44 +72,46 @@ var accLabel = Ti.UI.createLabel({
 var speedlabel = Titanium.UI.createLabel({
 	color:'#333',
 	text:'0.0',
-	font:{fontSize:72,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+	font:{fontSize:64,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:120
+    top:60
 });
 
 var speedUnitLabel = Ti.UI.createLabel({
     color:'#333',
-   	font:{fontSize:20,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+   	font:{fontSize:22,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:200,
+    top:125,
     text:'MPH'
 });
 
 
 var headingLabel = Ti.UI.createLabel({
     color:'#333',
-   	font:{fontSize:20,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+   	font:{fontSize:24,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:75,
+    top:20,
     text:'000\u00B0' // this is the degree symbol
 });
+
+// TODO: remove, this is only for debugging:
 var headingAccuracyLabel = Ti.UI.createLabel({
     color:'#333',
     font:{fontSize:12,fontFamily:'Helvetica Neue'},
     textAlign:'center',
     height:'auto',
-    top:95
+    top:45
 });
 
-var distanceLabel = Ti.UI.createLabel({
+var accuracyLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:240
+    bottom:120
 });
 
 //// Testing to see if the canvas view exists
@@ -105,20 +121,92 @@ var distanceLabel = Ti.UI.createLabel({
 //dashboardView.add(canvas);
 //
 
-var compass = Ti.UI.createImageView({
-    url: '../images/compass.png',
-    width:278,height:278,
-    center:{x:160,y:180} // i think that x and y are transposed
+var compassView = Ti.UI.createView({
+    size:{width:320,height:200},
+    center:{x:160,y:160},
+    left:0,top:65
 });
 
-// logging methods
-var eventID;
-var currentSample = new Object;
-var loggingInterval = 0;
-var logDB;
+var compass = Ti.UI.createImageView({
+    url: '../images/small-compass-shadow.png',
+    width:200,height:200,
+    top:0,
+    //center:{x:160,y:0} // this should be relative to the parent view. i think that x and y are transposed
+});
 
+compassView.add(compass);
+
+
+var consoleView = Ti.UI.createView({
+   size:{width:320,height:110},
+   left:0,bottom:0
+});
+
+var consoleImage = Ti.UI.createImageView({
+    url:'../images/bottom.png',
+    width:320,height:82,
+    bottom:0
+});
+
+var forceImage = Ti.UI.createImageView({
+    url:'../images/blue-circle.png',
+    width:62,height:62,
+    bottom:50
+});
+
+var forceLabel = Ti.UI.createLabel({
+    height:'auto',
+    textAlign:'center',
+    text:'0.0 g',
+    color:'#333',
+    font:{fontSize:12,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+});
+forceImage.add(forceLabel);
+
+
+// add a duration label
+var durationLabel = Ti.UI.createLabel({
+    text:'0:00',
+    height:'auto',
+    textAlign:'left',
+    color:'#333',
+    font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+});
+durationLabel.left = 10;
+consoleImage.add(durationLabel);
+
+// add a distance label
+var distanceLabel = Ti.UI.createLabel({
+    text:'0 '+distanceUnits,
+    height:'auto',
+    textAlign:'right',
+    color:'#333',
+    font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+});
+distanceLabel.right = 10;
+consoleImage.add(distanceLabel);
+
+
+consoleView.add(consoleImage);
+consoleView.add(forceImage);
+
+
+var uploadStatusImage = Ti.UI.createImageView({
+    url:'../images/orange-circle.png',
+    width:62,height:62,
+    center:{x:160,y:0}
+});
+
+dashboardView.add(uploadStatusImage);
+
+// logging methods
 function startLogging() {
     Ti.API.info("Inside the startLogging() method");
+
+    // TODO: this method should populate a new row in the meta table
+    // this table will contain the eventID, startdate/time, tags, notes, userID, et al.
+    // the logdata table contain the actual samples, using a primary key...perhaps the eventID?
+    // or this could be done traditionally, with a lookup.
 
     // open the database connection (create if necessary)
     logDB = Ti.Database.open("log.db");
@@ -129,13 +217,16 @@ function startLogging() {
     // generate an eventID:
     //eventID = Titanium.Platform.createUUID();
 
-    eventID = Titanium.Utils.md5HexDigest(new Date().toUTCString());
-
+    eventStartDate = new Date();
+    eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
 
     // clear the current sample
     //currentSample = new Object;
     currentSample.eventID = eventID;
     loggingInterval = setInterval(recordSample,1000);
+
+    // start a timer for the clock update
+    clockInterval = setInterval(updateClock,1000);
 
     // disable the idle timer while logging
     Ti.App.idleTimerDisabled = true;
@@ -148,6 +239,8 @@ function stopLogging() {
     clearInterval(loggingInterval);
     loggingInterval = 0;
 
+    clearInterval(clockInterval);
+    clockInterval = 0;
    
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
@@ -253,21 +346,16 @@ loggingSwitch.addEventListener('change',function(e) {
 
 });
 
-dashboardView.add(compass);
+compassView.add(speedlabel);
+compassView.add(speedUnitLabel);
 
-//// add the dashboard webview to the dashboard window
-//var webview = Ti.UI.createWebView();
-//webview.url = "dashboard.html";
-//dashboardView.add(webview);
-//
+compassView.add(headingLabel);
+compassView.add(headingAccuracyLabel);
 
-dashboardView.add(speedlabel);
-dashboardView.add(speedUnitLabel);
+dashboardView.add(compassView);
+dashboardView.add(consoleView);
 
-dashboardView.add(headingLabel);
-dashboardView.add(headingAccuracyLabel);
-
-dashboardView.add(distanceLabel);
+dashboardView.add(accuracyLabel);
 dashboardView.add(accLabel);
 
 dashboardView.add(loggingSwitch);
@@ -281,9 +369,32 @@ function updateHeadingLabel(heading) {
     headingLabel.text = parseInt(heading) + "\u00B0";
 }
 
-function updateDistanceLabel(distance) {
-    distanceLabel.text = parseFloat(distance).toFixed(2) + "m accuracy";
+function updateAccuracyLabel(meters) {
+    accuracyLabel.text = parseFloat(meters).toFixed(2) + "m accuracy";
 }
+
+function updateForceLabel (force) {
+    forceLabel.text = parseFloat(force).toFixed(1) + 'g';
+}
+
+// simple padding function
+function pad2(number) {
+     return (number < 10 ? '0' : '') + number   
+}
+
+
+function updateClock() {
+    // use the recorded start time and current time to set a clock display
+    var currentTime = new Date().getTime();
+    var duration = currentTime - eventStartDate.getTime(); // millis
+
+    var hour = Math.floor(duration / 1000 / 60 / 60);
+    var min = Math.floor(duration / 1000 / 60) % 60;
+    var sec = Math.floor(duration / 1000) % 60;
+
+    durationLabel.text = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
+}
+
 
 function rotateCompass(degrees) {
 // cloud 1 animation/transform
@@ -464,7 +575,7 @@ else
 		var altitudeAccuracy = e.coords.altitudeAccuracy;
 
         // update the labels with the current data:
-        updateDistanceLabel(accuracy);
+        updateAccuracyLabel(accuracy);
         speedlabel.text = (2.236936 * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 
         // update the current sample object with the new data:
@@ -528,6 +639,25 @@ Titanium.Accelerometer.addEventListener('update',function(e)
 
     var msg = "accelerometer - x:"+acc[0].toFixed(2)+",y:"+acc[1].toFixed(2)+",z:"+acc[2].toFixed(2); 
     accLabel.text = msg;
+
+    // update the force label with the total magnitude of the forces
+    // is simple addition enough?
+    // TODO: animate the force image on big hits
+    var mag = acc[0]+acc[1]+acc[2];
+    updateForceLabel(mag);
+
+	// animate force image
+	// use a callback at the end to scale back
+    //
+    if(mag > 1.5 && forceImage.animating == false) {
+        var t = Titanium.UI.create2DMatrix();
+        t = t.scale(1.1);
+        forceImage.animate({transform:t, duration:50},function()
+        {
+            var t = Titanium.UI.create2DMatrix();
+            forceImage.animate({transform:t, duration:100});
+        });
+    }
 
     // add the readings to the current sample:
     var precision = 3;
