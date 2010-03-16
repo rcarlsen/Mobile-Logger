@@ -53,18 +53,24 @@ function sendLog(){
     var eventList = eventListArray.join();
     
     // i think that each of these items needs to be surrounded by quotes
-    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID IN (?)',eventList);
+    //var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID IN (?)',eventList);
+    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID = ?',eventListArray[0]);
     
     // the rowCount seems to be limited to 1000 rows. why?
-    Titanium.API.info('Samples retrieved from db: ' + rows.getRowCount());
-    Titanium.API.info('Rows affected: ' + logDB.rowsAffected);
+    // The problem seems alleviated after two changes:
+    // 1. commented out the getRowCount() call.
+    // 2. changed the execute statement to 'EVENTID = ?', eventListArray[0]
+    // Not sure which, if either, of these did the trick.
+    //
+    //Titanium.API.info('Samples retrieved from db: ' + rows.getRowCount());
+    //Titanium.API.info('Rows affected: ' + logDB.rowsAffected);
 
     // TODO: group the rows by eventID
     var tmpData=[];
-    while(rows.validRow){ // will this skip the first row?i
+    while(1){
         var thisData = rows.fieldByName('DATA');
         tmpData.push(JSON.parse(thisData));
-        rows.next();
+        if(rows.next() == false) break;
     };
     rows.close();
     logDB.close();
@@ -172,14 +178,17 @@ logTable.addEventListener('click',function(e)
                     // forward the event to the delete listener
                     Ti.API.info('Delete Log button pressed for event: '+e.row.eventID);
                     deleteEvent(e.row.eventID);
+                    toggleSelection(false);
                     break;
                 case 3:
                     Ti.API.info('Cancel button pressed');
+                    toggleSelection(false);
                     break;
 
                 default:
                     Ti.API.info('Default case in options dialog.');
                     // this shouldn't happen
+                    toggleSelection(false);
                     return;
             }
         }
