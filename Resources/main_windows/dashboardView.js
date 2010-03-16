@@ -9,14 +9,16 @@ var loggingState = false; // toggle this when recording
 // should this be a property, or something not tied to this class?
 
 var eventID;
-var currentSample = new Object;
+var currentSample = new Object();
 var loggingInterval = 0;
 var logDB;
 
+var eventDistance = 0;
 var eventStartDate;
 var clockInterval = 0;
+var audioListenerInterval = 0;
 
-var distanceUnits = "Mi";
+var distanceUnits = "Miles";
 // end instance vars //
 
 var dashboardView = Ti.UI.createView({
@@ -36,16 +38,16 @@ var dashboardView = Ti.UI.createView({
 
 // toggle switch for enabling logging
 var loggingSwitch = Titanium.UI.createSwitch({
-    top:40,right:10,
+    top:30,right:10,
     value:false
 });
 
 var loggingLabel = Ti.UI.createLabel({
-    top:10,
+    top:5,
     right:10,
     height:'auto',
     textAlign:'right',
-    text:'Logging Active:',
+    text:'Logging:',
     color:'#333',
 	font:{fontSize:16,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
@@ -151,7 +153,7 @@ var consoleImage = Ti.UI.createImageView({
 var forceImage = Ti.UI.createImageView({
     url:'../images/blue-circle.png',
     width:62,height:62,
-    bottom:50
+    bottom:48
 });
 
 var forceLabel = Ti.UI.createLabel({
@@ -173,17 +175,37 @@ var durationLabel = Ti.UI.createLabel({
     font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
 durationLabel.left = 10;
+
+var durationUnitLabel = Ti.UI.createLabel({
+    text:'Duration',
+    height:'auto',
+    textAlign:'left',
+    color:'#333',
+    font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+});
+durationUnitLabel.bottom = -15;
+durationLabel.add(durationUnitLabel);
 consoleImage.add(durationLabel);
 
 // add a distance label
 var distanceLabel = Ti.UI.createLabel({
-    text:'0 '+distanceUnits,
+    text:'0.00',
     height:'auto',
     textAlign:'right',
     color:'#333',
     font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
 distanceLabel.right = 10;
+
+var distanceUnitLabel = Ti.UI.createLabel({
+    text:distanceUnits,
+    height:'auto',
+    textAlign:'right',
+    color:'#333',
+    font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+});
+distanceUnitLabel.bottom = -15;
+distanceLabel.add(distanceUnitLabel);
 consoleImage.add(distanceLabel);
 
 
@@ -191,13 +213,22 @@ consoleView.add(consoleImage);
 consoleView.add(forceImage);
 
 
-var uploadStatusImage = Ti.UI.createImageView({
+var audioLevelImage = Ti.UI.createImageView({
     url:'../images/orange-circle.png',
     width:62,height:62,
     center:{x:160,y:0}
 });
 
-dashboardView.add(uploadStatusImage);
+var audioLevelLabel = Ti.UI.createLabel({
+    bottom:15,
+    height:'auto',
+    textAlign:'center',
+    text:'Off',
+    color:'#333',
+    font:{fontSize:12,fontFamily:'Helvetica Neue',fontWeight:'bold'}
+
+});
+audioLevelImage.add(audioLevelLabel);
 
 // logging methods
 function startLogging() {
@@ -221,12 +252,16 @@ function startLogging() {
     eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
 
     // clear the current sample
-    //currentSample = new Object;
+    // This isn't working...new location, heading and acc data isn't saved.
+    //currentSample = {};
     currentSample.eventID = eventID;
     loggingInterval = setInterval(recordSample,1000);
 
     // start a timer for the clock update
     clockInterval = setInterval(updateClock,1000);
+
+    // reset the event distance
+    eventDistance = 0;
 
     // disable the idle timer while logging
     Ti.App.idleTimerDisabled = true;
@@ -270,6 +305,23 @@ function recordSample() {
 };
 // end logging methods//
 
+function toRad (deg) {
+    // convert from degrees to radians
+    var conversion = (Math.PI * 2) / 360;
+    return deg*conversion;
+}
+
+function calculateDistanceDelta(pt1,pt2) {
+    // the points should be hashes with {lon, lat}
+    // calculate distance between adjacent points
+    // reference for estimate in JavaScript.
+     var R = 6371; // km
+     var d =    Math.acos(Math.sin(toRad(pt1.lat))*
+                Math.sin(toRad(pt2.lat))+Math.cos(toRad(pt1.lat))*
+                Math.cos(toRad(pt2.lat))*Math.cos(toRad(pt2.lon)-toRad(pt1.lon))) * R;
+
+    return d; // in meters?
+};
 
 // hack for the setting the value of the switch at launch
 var switchFirstRun = true;
@@ -293,14 +345,7 @@ loggingSwitch.addEventListener('change',function(e) {
             buttonNames: ['OK','Cancel']
         });
         alertDialog.addEventListener('click',function(e) {
-            // here is where to parse the response
-                // debugging
-//                Titanium.API.debug(e);
-//                statusLabel.text = 'event: '+e.index;
-//                loggingState = false;
-
             if(e.index == 0){ // 0: OK, 1: button2 (Cancel)
-                // TODO: implement some actual logic here
                 loggingState = false;
                 stopLogging();
             } else {
@@ -346,6 +391,9 @@ loggingSwitch.addEventListener('change',function(e) {
 
 });
 
+dashboardView.add(accuracyLabel);
+dashboardView.add(accLabel);
+
 compassView.add(speedlabel);
 compassView.add(speedUnitLabel);
 
@@ -355,11 +403,10 @@ compassView.add(headingAccuracyLabel);
 dashboardView.add(compassView);
 dashboardView.add(consoleView);
 
-dashboardView.add(accuracyLabel);
-dashboardView.add(accLabel);
-
 dashboardView.add(loggingSwitch);
 dashboardView.add(loggingLabel);
+
+dashboardView.add(audioLevelImage);
 
 // add the changed objects to the current window
 Ti.UI.currentWindow.add(dashboardView);
@@ -395,6 +442,98 @@ function updateClock() {
     durationLabel.text = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
 }
 
+function updateDistanceLabel (delta) {
+    // expects a ivar with the current distance
+    eventDistance += delta;
+
+    Ti.API.info('Distance delta: '+delta);
+    Ti.API.info('Event distance: '+eventDistance);
+
+    // convert the meters to an appropriate display unit. (miles only for now)
+    // 1 meter = 0.000621371192 miles
+    var displayDistance = eventDistance * 0.000621371192; // miles
+
+    Ti.API.info('Display distance: '+displayDistance);
+    distanceLabel.text = parseFloat(displayDistance).toFixed(2);
+}
+
+
+function floatToDB (level) {
+    // convert the float value to DBFS:
+    /*
+    Using the natural log, ln, log base e:
+    linear-to-db(x) = ln(x) / (ln(10) / 20)
+    db-to-linear(x) = e^(x * (ln(10) / 20))
+
+    Using the common log, log, log base 10:
+    linear-to-db(x) = log(x) * 20
+    db-to-linear(x) = 10^(x / 20)
+    
+    */ 
+    return (20 * (Math.log(level / 1.0)/Math.LN10));
+}
+
+function DBFStoSPL (db) {
+    // approximately convert dbfs to spl
+    // estimate of spl (sound pressure level) conversion
+    // dbspl(db) = 20*log10( (10^(db/10)/.000002))
+    
+    // I really don't know if this is calibrated to the iPhone mic
+    // or if it's accurate at all.
+    return 20* (Math.log(Math.pow(10,(db/10))/0.000002)/Math.LN10);
+}
+
+
+function checkAudioLevels() {
+	var peak = Ti.Media.peakMicrophonePower;
+    if(peak == -1) {
+        audioLevelLabel.text = 'Off';
+    } else {
+        // Ti.API.info('Mic peak level: '+peak);
+        var dbfs = floatToDB(peak);
+        var dbspl = DBFStoSPL(dbfs);
+
+        // Ti.API.info('dBFS: '+dbfs);
+        // Ti.API.info('dBSPL: '+dbspl);
+
+        audioLevelLabel.text = Math.ceil(dbspl) + " dB";
+
+        // store the audio levels
+        currentSample.dbfs = parseFloat(dbfs.toFixed(1));
+        currentSample.dbspl = parseFloat(dbspl.toFixed(1));
+
+        // animate audio image
+        // use a callback at the end to scale back
+        // using 90 as a threshhold - busy street for dB (not dBFS)
+        if(dbspl >= 90 && audioLevelImage.animating == false) {
+            var t = Titanium.UI.create2DMatrix();
+            t = t.scale(1.1 + ((dbspl-90)/20)); // scale relative to dbspl
+            audioLevelImage.animate({transform:t, duration:100},function()
+            {
+                var t = Titanium.UI.create2DMatrix();
+                audioLevelImage.animate({transform:t, duration:200});
+            });
+        }
+    }
+}
+
+function setAudioMonitoring (state) {
+    if(state == true) {
+        Ti.Media.startMicrophoneMonitor();
+        audioListenerInterval = setInterval(checkAudioLevels,300);
+    } else {
+        Ti.Media.stopMicrophoneMonitor();
+        clearInterval(audioListenerInterval);
+        audioListenerInterval = 0;
+
+        // check one last time to trigger a -1 reading
+        checkAudioLevels();
+    }
+}
+
+// Enable audio monitoring by default
+// TODO: add a user preference and store it as a property
+setAudioMonitoring(true);
 
 function rotateCompass(degrees) {
 // cloud 1 animation/transform
@@ -578,6 +717,18 @@ else
         updateAccuracyLabel(accuracy);
         speedlabel.text = (2.236936 * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 
+        // calculate distance travelled.
+        // TODO: filter out small changes to minimize cumulative errors?
+
+        // only calculate distance if logging is enabled
+        if(loggingState == true) {
+            var dist = calculateDistanceDelta({lon:currentSample.lon,lat:currentSample.lat},
+                                              {lon:longitude,lat:latitude});
+            if(dist > 0) {
+                updateDistanceLabel(dist);
+            }
+        }
+
         // update the current sample object with the new data:
         currentSample.lat = latitude;
         currentSample.lon = longitude;
@@ -638,24 +789,30 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     };
 
     var msg = "accelerometer - x:"+acc[0].toFixed(2)+",y:"+acc[1].toFixed(2)+",z:"+acc[2].toFixed(2); 
-    accLabel.text = msg;
+    // DEBUG: only for debugging the accelerometer
+    //accLabel.text = msg;
 
     // update the force label with the total magnitude of the forces
     // is simple addition enough?
     // TODO: animate the force image on big hits
-    var mag = acc[0]+acc[1]+acc[2];
-    updateForceLabel(mag);
+    //var mag = acc[0]+acc[1]+acc[2];
+    var mag = Math.sqrt(acc[0]*acc[0]+acc[1]*acc[1]+acc[2]*acc[2]);
 
+
+    // Let the label lock to the triggered value during animation
+    if(!forceImage.animating) {
+       updateForceLabel(mag);
+    }
 	// animate force image
 	// use a callback at the end to scale back
     //
-    if(mag > 1.5 && forceImage.animating == false) {
+    if(Math.abs(mag) > 1.5 && forceImage.animating == false) {
         var t = Titanium.UI.create2DMatrix();
-        t = t.scale(1.1);
-        forceImage.animate({transform:t, duration:50},function()
+        t = t.scale(Math.abs(mag));
+        forceImage.animate({transform:t, duration:100},function()
         {
             var t = Titanium.UI.create2DMatrix();
-            forceImage.animate({transform:t, duration:100});
+            forceImage.animate({transform:t, duration:200});
         });
     }
 
