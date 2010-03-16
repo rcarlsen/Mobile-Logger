@@ -54,26 +54,34 @@ function sendLog(){
     
     // i think that each of these items needs to be surrounded by quotes
     var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID IN (?)',eventList);
+    
+    // the rowCount seems to be limited to 1000 rows. why?
     Titanium.API.info('Samples retrieved from db: ' + rows.getRowCount());
-  
+    Titanium.API.info('Rows affected: ' + logDB.rowsAffected);
+
     // TODO: group the rows by eventID
     var tmpData=[];
-    while(rows.isValidRow()){
+    while(rows.validRow){ // will this skip the first row?i
         var thisData = rows.fieldByName('DATA');
-        tmpData.push(thisData);
+        tmpData.push(JSON.parse(thisData));
         rows.next();
     };
     rows.close();
     logDB.close();
 
+    Ti.API.info('log row count: '+tmpData.length);
+
     // ok, now construct the email window
     var emailView = Ti.UI.createEmailDialog();
     emailView.setSubject('Log data');
     
-    var tmpDataString = tmpData.join();
+    //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
+    var tmpDataString = JSON.stringify(tmpData);
+    
     emailView.setMessageBody('Your log data is below: \n\n' + tmpDataString);
 
-    Ti.API.info('output string: '+tmpDataString);
+    // this is a huge string
+    //Ti.API.info('output string: '+tmpDataString);
 
     // emailView.addAttachment(tmpDataString);
 
