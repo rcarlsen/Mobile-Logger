@@ -124,7 +124,7 @@ var accuracyLabel = Ti.UI.createLabel({
 //
 
 var compassView = Ti.UI.createView({
-    size:{width:320,height:200},
+    width:320,height:200,
     center:{x:160,y:160},
     left:0,top:65
 });
@@ -136,11 +136,47 @@ var compass = Ti.UI.createImageView({
     //center:{x:160,y:0} // this should be relative to the parent view. i think that x and y are transposed
 });
 
-compassView.add(compass);
+//compassView.borderWidth = 1;
 
+// use an animated view (circle - rect with lots of border radius)
+// to indicate the location accuracy
+var accuracyView = Ti.UI.createView({
+    opacity:0.4,
+    //backgroundColor:'rgb(171,200,226)',
+    backgroundColor:'#ABC8E2',
+    width:10,height:10,
+    borderRadius:5
+});
+
+// TODO: move this to an appropriate place
+function updateAccuracyView (meters) {
+    // create an animation for the accuracy
+    // scale? starts at 5k, usually 100-50m
+    // map the meters to an appropriate scale
+
+    // set up some constraints
+    var minMeters = 25;
+    var maxMeters = 500;
+    var minPx = 10;
+    var maxPx = 400;
+
+    // map / normalize the scale:
+    var sc = (((meters-minMeters)/(maxMeters-minMeters)) * (maxPx-minPx) + minPx)/minPx;
+	var t = Titanium.UI.create2DMatrix();
+	t = t.scale(sc + 0.2);
+	accuracyView.animate({transform:t, duration:300},function()
+	{
+		var t = Titanium.UI.create2DMatrix();
+        t = t.scale(sc);
+		accuracyView.animate({transform:t, duration:200});
+	});
+}
+
+compassView.add(compass);
+compassView.add(accuracyView);
 
 var consoleView = Ti.UI.createView({
-   size:{width:320,height:110},
+   width:320,height:'auto',
    left:0,bottom:0
 });
 
@@ -216,7 +252,8 @@ consoleView.add(forceImage);
 var audioLevelImage = Ti.UI.createImageView({
     url:'../images/orange-circle.png',
     width:62,height:62,
-    center:{x:160,y:0}
+    //center:{x:160,y:0},
+    top:-31
 });
 
 var audioLevelLabel = Ti.UI.createLabel({
@@ -229,6 +266,15 @@ var audioLevelLabel = Ti.UI.createLabel({
 
 });
 audioLevelImage.add(audioLevelLabel);
+
+
+function resetValues () {
+    // reset the necessary ivars
+    currentSample = new Object();
+    eventDistance = 0;
+    eventStartDate = new Date();
+    eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
+}
 
 // logging methods
 function startLogging() {
@@ -244,24 +290,21 @@ function startLogging() {
     logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
     logDB.close();
 
-    // this isn't working for android
-    // generate an eventID:
-    //eventID = Titanium.Platform.createUUID();
-
-    eventStartDate = new Date();
-    eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
-
-    // clear the current sample
-    // This isn't working...new location, heading and acc data isn't saved.
-    //currentSample = {};
+    // (re)set variables for this new event
+    resetValues();
     currentSample.eventID = eventID;
+
+    loggingState = true;
+    
+    // grab the current position and fill in the currentSample
+    if (Titanium.Geolocation.locationServicesEnabled==true) {
+        Ti.Geolocation.getCurrentPosition(function(e){updateLocationData(e);});
+    }
+
     loggingInterval = setInterval(recordSample,1000);
 
     // start a timer for the clock update
     clockInterval = setInterval(updateClock,1000);
-
-    // reset the event distance
-    eventDistance = 0;
 
     // disable the idle timer while logging
     Ti.App.idleTimerDisabled = true;
@@ -271,12 +314,15 @@ function startLogging() {
 
 function stopLogging() {
     Ti.API.info('In the stopLogging method');
+    
+    loggingState = false;
+  
     clearInterval(loggingInterval);
     loggingInterval = 0;
 
     clearInterval(clockInterval);
     clockInterval = 0;
-   
+  
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
 };
@@ -320,7 +366,7 @@ function calculateDistanceDelta(pt1,pt2) {
                 Math.sin(toRad(pt2.lat))+Math.cos(toRad(pt1.lat))*
                 Math.cos(toRad(pt2.lat))*Math.cos(toRad(pt2.lon)-toRad(pt1.lon))) * R;
 
-    return d; // in meters?
+    return d*1000; // in meters?
 };
 
 // hack for the setting the value of the switch at launch
@@ -346,7 +392,6 @@ loggingSwitch.addEventListener('change',function(e) {
         });
         alertDialog.addEventListener('click',function(e) {
             if(e.index == 0){ // 0: OK, 1: button2 (Cancel)
-                loggingState = false;
                 stopLogging();
             } else {
                 // the cancel button was pressed, restore the switch state
@@ -359,8 +404,6 @@ loggingSwitch.addEventListener('change',function(e) {
 
     } else if(loggingState==false) { // don't start a new log if we're already logging
         Titanium.API.info("Logging switch activated");
-
-        loggingState = true;
         startLogging();
 
         // prompt to begin logging
@@ -411,6 +454,10 @@ dashboardView.add(audioLevelImage);
 // add the changed objects to the current window
 Ti.UI.currentWindow.add(dashboardView);
 
+function updateSpeedLabel (speed) {
+    speedlabel.text = (2.236936 * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
+}
+
 function updateHeadingLabel(heading) {
     // this is needed to append the degree symbol to the heading label
     headingLabel.text = parseInt(heading) + "\u00B0";
@@ -442,6 +489,13 @@ function updateClock() {
     durationLabel.text = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
 }
 
+// testing
+var dummyDistIncrementInterval;
+//dummyDistIncrementInterval = setInterval(dummyDist,1000);
+function dummyDist() {
+    updateDistanceLabel(1);
+}
+
 function updateDistanceLabel (delta) {
     // expects a ivar with the current distance
     eventDistance += delta;
@@ -452,6 +506,7 @@ function updateDistanceLabel (delta) {
     // convert the meters to an appropriate display unit. (miles only for now)
     // 1 meter = 0.000621371192 miles
     var displayDistance = eventDistance * 0.000621371192; // miles
+    //var displayDistance = eventDistance;
 
     Ti.API.info('Display distance: '+displayDistance);
     distanceLabel.text = parseFloat(displayDistance).toFixed(2);
@@ -459,6 +514,7 @@ function updateDistanceLabel (delta) {
 
 
 function floatToDB (level) {
+    // AudioQueueLevelMeterState (iPhone)
     // convert the float value to DBFS:
     /*
     Using the natural log, ln, log base e:
@@ -480,21 +536,30 @@ function DBFStoSPL (db) {
     
     // I really don't know if this is calibrated to the iPhone mic
     // or if it's accurate at all.
-    return 20* (Math.log(Math.pow(10,(db/10))/0.000002)/Math.LN10);
+    
+    // I think this is the baseline for human hearing, but the iPhone is much more limited
+    //return 20* (Math.log(Math.pow(10,(db/10))/0.000002)/Math.LN10);
+    
+    //return 20* (Math.log(Math.pow(10,(db/10))/0.0000035)/Math.LN10);
+    
+    // this *should* be normalized for a dBFS range of -60:0, 
+    // and produce a dB SPL range of 0:120 
+    return 20* (Math.log(Math.pow(10,(db/10))/0.000001)/Math.LN10);
 }
 
 
 function checkAudioLevels() {
-	var peak = Ti.Media.peakMicrophonePower;
+	//var peak = Ti.Media.peakMicrophonePower;
+	var peak = Ti.Media.averageMicrophonePower;
     if(peak == -1) {
         audioLevelLabel.text = 'Off';
     } else {
-        // Ti.API.info('Mic peak level: '+peak);
+        //Ti.API.info('Mic level: '+peak);
         var dbfs = floatToDB(peak);
         var dbspl = DBFStoSPL(dbfs);
 
-        // Ti.API.info('dBFS: '+dbfs);
-        // Ti.API.info('dBSPL: '+dbspl);
+        //Ti.API.info('dBFS: '+dbfs);
+        //Ti.API.info('dBSPL: '+dbspl);
 
         audioLevelLabel.text = Math.ceil(dbspl) + " dB";
 
@@ -533,7 +598,10 @@ function setAudioMonitoring (state) {
 
 // Enable audio monitoring by default
 // TODO: add a user preference and store it as a property
-setAudioMonitoring(true);
+// iPhone only?
+if(Ti.Platform.name == 'iPhone OS') {
+    setAudioMonitoring(true);
+}
 
 function rotateCompass(degrees) {
 // cloud 1 animation/transform
@@ -550,6 +618,7 @@ function rotateCompass(degrees) {
 	//a.repeat = 0;
 	compass.animate(a); // TODO: rotate a compass widget instead
 }
+
 
 // TODO: figure out how to move the geolocation and accelerometer stuff to another class
 // for now, let's make this monolithic to get the ball rolling.
@@ -602,7 +671,7 @@ else
 
 
 			//currentHeading.text = 'x:' + x + ' y: ' + y + ' z:' + z;
-			Titanium.API.info('geo - current heading: ' + new Date(timestamp) + ' x ' + x + ' y ' + y + ' z ' + z);
+			//Titanium.API.info('geo - current heading: ' + new Date(timestamp) + ' x ' + x + ' y ' + y + ' z ' + z);
 		});
 
 		//
@@ -643,7 +712,7 @@ else
             updateHeadingLabel(trueHeading);
             rotateCompass(trueHeading);
 
-			Titanium.API.info('geo - heading updated: ' + new Date(timestamp) + ' x ' + x + ' y ' + y + ' z ' + z);
+			//Titanium.API.info('geo - heading updated: ' + new Date(timestamp) + ' x ' + x + ' y ' + y + ' z ' + z);
 		});
 	}
 	else
@@ -673,24 +742,9 @@ else
 	//
 	Titanium.Geolocation.getCurrentPosition(function(e)
 	{
-		if (e.error)
-		{
-			Titanium.API.info('error: ' + JSON.stringify(e.error));
-			return;
-		}
-
-		var longitude = e.coords.longitude;
-		var latitude = e.coords.latitude;
-		var altitude = e.coords.altitude;
-		var heading = e.coords.heading;
-		var accuracy = e.coords.accuracy;
-		var speed = e.coords.speed;
-		var timestamp = e.coords.timestamp;
-		var altitudeAccuracy = e.coords.altitudeAccuracy;
-
-//		currentLocation.text = 'long:' + longitude + ' lat: ' + latitude;
+        updateLocationData(e);	
 		
-		Titanium.API.info('geo - current location: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
+		//Titanium.API.info('geo - current location: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
 	});
 
 	//
@@ -698,47 +752,7 @@ else
 	//
 	Titanium.Geolocation.addEventListener('location',function(e)
 	{
-		if (e.error)
-		{
-			Titanium.API.info('error:' + JSON.stringify(e.error));
-			return;
-		}
-
-		var longitude = e.coords.longitude;
-		var latitude = e.coords.latitude;
-		var altitude = e.coords.altitude;
-		var heading = e.coords.heading;
-		var accuracy = e.coords.accuracy;
-		var speed = e.coords.speed;
-		var timestamp = e.coords.timestamp;
-		var altitudeAccuracy = e.coords.altitudeAccuracy;
-
-        // update the labels with the current data:
-        updateAccuracyLabel(accuracy);
-        speedlabel.text = (2.236936 * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
-
-        // calculate distance travelled.
-        // TODO: filter out small changes to minimize cumulative errors?
-
-        // only calculate distance if logging is enabled
-        if(loggingState == true) {
-            var dist = calculateDistanceDelta({lon:currentSample.lon,lat:currentSample.lat},
-                                              {lon:longitude,lat:latitude});
-            if(dist > 0) {
-                updateDistanceLabel(dist);
-            }
-        }
-
-        // update the current sample object with the new data:
-        currentSample.lat = latitude;
-        currentSample.lon = longitude;
-        currentSample.alt = altitude;
-        currentSample.locAcc = accuracy;
-        currentSample.altAcc = altitudeAccuracy;
-        currentSample.speed = speed;
-        currentSample.timestamp = timestamp;
-        currentSample.heading = heading; // TODO: use the heading from the heading callback.
-
+        updateLocationData(e);
 
 //		updatedLocation.text = 'long:' + longitude;
 //		updatedLatitude.text = 'lat: '+ latitude;
@@ -767,11 +781,61 @@ else
 //		});
 //		
 //		
-		Titanium.API.info('geo - location updated: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
+		//Titanium.API.info('geo - location updated: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
 	});
 
 	
 }
+
+function updateLocationData(e) {
+    if (e.error)
+    {
+        Titanium.API.info('error:' + JSON.stringify(e.error));
+        return;
+    }
+
+    var longitude = e.coords.longitude;
+    var latitude = e.coords.latitude;
+    var altitude = e.coords.altitude;
+    var heading = e.coords.heading;
+    var accuracy = e.coords.accuracy;
+    var speed = e.coords.speed;
+    var timestamp = e.coords.timestamp;
+    var altitudeAccuracy = e.coords.altitudeAccuracy;
+
+    // update the labels with the current data:
+    updateAccuracyLabel(accuracy);
+    updateSpeedLabel(speed);
+    updateAccuracyView(accuracy);
+
+    // calculate distance travelled.
+    // TODO: filter out small changes to minimize cumulative errors?
+
+    // only calculate distance if logging is enabled
+    // DEBUG: update all the time for testing.
+    if(loggingState == true && (currentSample.lon && currentSample.lat)) {
+        var dist = calculateDistanceDelta({lon:currentSample.lon,lat:currentSample.lat},
+                                          {lon:longitude,lat:latitude});
+        Ti.API.info('Sample distance: '+dist);
+        
+        // distance display never updated.
+        // Update: distance display seems to only show the delta
+        // rather than the accumulated distance.
+        if(Math.abs(dist) > 0.0) {
+            updateDistanceLabel(dist);
+        }
+    }
+
+    // update the current sample object with the new data:
+    currentSample.lat = latitude;
+    currentSample.lon = longitude;
+    currentSample.alt = altitude;
+    currentSample.locAcc = accuracy;
+    currentSample.altAcc = altitudeAccuracy;
+    currentSample.speed = speed;
+    currentSample.timestamp = timestamp;
+    currentSample.heading = heading; // TODO: use the heading from the heading callback.
+};
 
 // methods for the accelerometer
 Titanium.Accelerometer.addEventListener('update',function(e)
@@ -821,6 +885,7 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     currentSample.accx = parseFloat(acc[0].toFixed(precision));
     currentSample.accy = parseFloat(acc[1].toFixed(precision));
     currentSample.accz = parseFloat(acc[2].toFixed(precision));
+    currentSample.mag = mag;
 
     // TODO: big movements trigger an immediate recording
     // will this be instantaenous or will a historcal trend need to be recorded?

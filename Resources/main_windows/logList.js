@@ -5,6 +5,15 @@ Ti.include('../tools/json2.js');
 
 var win = Ti.UI.currentWindow;
 
+// add an activity indicator 
+// use this for slow loading stuff.
+var actInd = Titanium.UI.createActivityIndicator();
+if(Ti.Platform.name == 'iPhone OS') {
+    actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
+}
+win.add(actInd);
+
+
 var selectedEvents = new Array();
 
 // add a send action button
@@ -133,6 +142,8 @@ logTable.addEventListener('click',function(e)
     // TODO: organize the data into events
     // inspect each event in the child view
    
+    actInd.show();
+
     // because the android doesn't have a navbar with buttons,
     // use the options dialog (action sheet) to reveal
     // log inspection and upload functions
@@ -194,6 +205,9 @@ logTable.addEventListener('click',function(e)
         }
 
     });
+
+    actInd.hide();
+
     Ti.API.info('Showing the options dialog');
     optionsDialog.show();
 
@@ -223,7 +237,12 @@ logTable.addEventListener('click',function(e)
     
     function toggleSelection(force) {
         // toggle the checked status of this row
-       if(force === true || (e.row.hasCheck == null || e.row.hasCheck == false)) {
+        if(force == null) // actually perform a toggle
+        {
+            force = (e.row.hasCheck == null || e.row.hasCheck == false);
+        }
+
+       if(force === true){ // (e.row.hasCheck == null || e.row.hasCheck == false)) {
            var data = e.row;
            //logTable.updateRow(e.index,data);
             data.hasCheck = true;
@@ -299,14 +318,8 @@ function deleteEvent(eventID) {
 
 // call up the log list from the database
 function loadLogs () {
-    // display the activity indicator 
-    var actInd = Titanium.UI.createActivityIndicator();
-    if(Ti.Platform.name == 'iPhone OS') {
-        actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
-    }
-
+    // display the activity indicator
     actInd.show();
-        
     
     // open the database connection (create if necessary)
     var logDB = Ti.Database.open("log.db");
@@ -317,8 +330,8 @@ function loadLogs () {
     logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
 
     var rows = logDB.execute('SELECT * FROM LOGDATA GROUP BY EVENTID');
-    Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
-  
+    //Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
+    
     // TODO: group the rows by eventID
     var tmpData = new Array();
     var previousSelection = selectedEvents.slice(0);
@@ -333,6 +346,15 @@ function loadLogs () {
                                 eventID:rows.fieldByName('EVENTID'),
                                 content:thisData,
                                 timestamp:thisObject.timestamp};
+
+            /* // notes on creating custom row layouts
+            row = Ti.UI.createTableViewRow();
+            row.hasDetail = true;
+            row.title = rows.field(1);
+            row.leftImage = '../images/film/small/'+rows.fieldByName('small_img');
+            data[rows.field(0)] = row;
+            rows.next();
+            */
 
             // look up the eventid in the selectedEvents array.
             if(previousSelection.indexOf(rowParams.eventID) >= 0) {
