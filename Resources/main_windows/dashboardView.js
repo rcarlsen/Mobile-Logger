@@ -1,8 +1,14 @@
 // include files
 Ti.include('../tools/json2.js');
+Ti.include('../tools/util.js');
 
 // reference the parent window
-var win1 = Ti.UI.currentWindow;
+var win = Ti.UI.currentWindow;
+
+/*// toggle the display*/
+//win.addEventListener('twofingertap',function(e){
+    //toggleDisplayVisibility();
+/*});*/
 
 // set up some instance vars:
 var loggingState = false; // toggle this when recording
@@ -22,7 +28,8 @@ var distanceUnits = "Miles";
 // end instance vars //
 
 var dashboardView = Ti.UI.createView({
-    size:{width:320,height:win1.getHeight()},
+    size:{width:320,height:win.getHeight()},
+    backgroundColor:'#ccc',
     top:0,bottom:0
 });
 
@@ -148,32 +155,20 @@ var accuracyView = Ti.UI.createView({
     borderRadius:5
 });
 
-// TODO: move this to an appropriate place
-function updateAccuracyView (meters) {
-    // create an animation for the accuracy
-    // scale? starts at 5k, usually 100-50m
-    // map the meters to an appropriate scale
 
-    // set up some constraints
-    var minMeters = 25;
-    var maxMeters = 500;
-    var minPx = 10;
-    var maxPx = 400;
-
-    // map / normalize the scale:
-    var sc = (((meters-minMeters)/(maxMeters-minMeters)) * (maxPx-minPx) + minPx)/minPx;
-	var t = Titanium.UI.create2DMatrix();
-	t = t.scale(sc + 0.2);
-	accuracyView.animate({transform:t, duration:300},function()
-	{
-		var t = Titanium.UI.create2DMatrix();
-        t = t.scale(sc);
-		accuracyView.animate({transform:t, duration:200});
-	});
-}
+// This position is getting crowded with the speedLabel.
+// TODO: figure out a way to manage all these things in the compass view
+var locationView = Ti.UI.createView({
+    opacity:0.4,
+    backgroundColor:'#f27f14', // orange
+    width:10,height:10,
+    borderRadius:5
+});
 
 compassView.add(compass);
 compassView.add(accuracyView);
+compassView.add(locationView);
+
 
 var consoleView = Ti.UI.createView({
    width:320,height:'auto',
@@ -338,6 +333,9 @@ function recordSample() {
     logDB.execute('INSERT INTO LOGDATA VALUES(NULL,?,?)',eventID,JSON.stringify(currentSample));
     logDB.close();
 
+    // pulse red while recording
+    animateLocationView();
+
 //  this is neat, but it messes up the rotation animation
 //  the heartbeat animation would be great for another widget.
 //	// animate compass
@@ -351,23 +349,7 @@ function recordSample() {
 };
 // end logging methods//
 
-function toRad (deg) {
-    // convert from degrees to radians
-    var conversion = (Math.PI * 2) / 360;
-    return deg*conversion;
-}
 
-function calculateDistanceDelta(pt1,pt2) {
-    // the points should be hashes with {lon, lat}
-    // calculate distance between adjacent points
-    // reference for estimate in JavaScript.
-     var R = 6371; // km
-     var d =    Math.acos(Math.sin(toRad(pt1.lat))*
-                Math.sin(toRad(pt2.lat))+Math.cos(toRad(pt1.lat))*
-                Math.cos(toRad(pt2.lat))*Math.cos(toRad(pt2.lon)-toRad(pt1.lon))) * R;
-
-    return d*1000; // in meters?
-};
 
 // hack for the setting the value of the switch at launch
 var switchFirstRun = true;
@@ -487,6 +469,58 @@ function updateClock() {
     var sec = Math.floor(duration / 1000) % 60;
 
     durationLabel.text = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
+}
+
+
+function updateAccuracyView (meters) {
+    // create an animation for the accuracy
+    // scale? starts at 5k, usually 100-50m
+    // map the meters to an appropriate scale
+
+    // set up some constraints
+    var minMeters = 25;
+    var maxMeters = 500;
+    var minPx = 10;
+    var maxPx = 400;
+
+    // map / normalize the scale:
+    var sc = (((meters-minMeters)/(maxMeters-minMeters)) * (maxPx-minPx) + minPx)/minPx;
+	var t = Titanium.UI.create2DMatrix();
+	t = t.scale(sc + 0.2);
+	accuracyView.animate({transform:t, duration:300},function()
+	{
+		var t = Titanium.UI.create2DMatrix();
+        t = t.scale(sc);
+		accuracyView.animate({transform:t, duration:200});
+	});
+}
+
+function animateLocationView () {
+    var bg = locationView.backgroundColor;
+    
+    // color red
+	locationView.animate({backgroundColor:'#ff0000', duration:200},function()
+	{
+        // back to normal
+		locationView.animate({backgroundColor:bg, duration:300});
+	});   
+}
+
+// toggle the dashboard view transparency
+// trying to save a bit of the battery by disabling the screen
+// TODO: what about the tab bar?
+function toggleDisplayVisibility (state) {
+    // toggle if no input.
+    if(state == null) {
+        state = !dashboardView.visible;
+    }
+
+    if(state === true) {
+        dashboardView.show();
+    } else if (state === false) {
+        dashboardView.hide();
+    }
+
 }
 
 // testing

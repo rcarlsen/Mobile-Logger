@@ -5,7 +5,7 @@ var greenColor = 'rgb(85,130,80)';
 
 // create tab group
 var tabGroup = Titanium.UI.createTabGroup();
-tabGroup.backgroundColor=greenColor;
+//tabGroup.backgroundColor=greenColor;
 
 //
 // create base UI tab and root window
@@ -68,3 +68,23 @@ tabGroup.addTab(tabSettings);
 
 // open tab group
 tabGroup.open();
+
+
+// FIX: I don't think this is going to work.
+// set up a function to hide everything
+//var windowShade = Ti.UI.createWindow({
+//    backgroundColor:'#000',
+//    fullscreen:true
+//});
+//
+//function toggleDisplayVisibility (state) {
+//    // toggle if no input.
+//    if(state == null) {
+//        state = !windowShade.visible;
+//    }
+//    if(state === true) {
+//        windowShade.show();
+//    } else if (state === false) {
+//        windowShade.hide();
+//    }
+//}

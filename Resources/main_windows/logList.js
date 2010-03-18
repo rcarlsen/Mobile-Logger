@@ -2,6 +2,7 @@
 
 
 Ti.include('../tools/json2.js');
+Ti.include('export.js');
 
 var win = Ti.UI.currentWindow;
 
@@ -9,7 +10,8 @@ var win = Ti.UI.currentWindow;
 // use this for slow loading stuff.
 var actInd = Titanium.UI.createActivityIndicator();
 if(Ti.Platform.name == 'iPhone OS') {
-    actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
+    //actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
+    actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.DARK;
 }
 win.add(actInd);
 
@@ -88,12 +90,15 @@ function sendLog(){
 
     // ok, now construct the email window
     var emailView = Ti.UI.createEmailDialog();
-    emailView.setSubject('Log data');
+    emailView.setSubject(' Log data');
     
     //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
-    var tmpDataString = JSON.stringify(tmpData);
+    //var tmpDataString = JSON.stringify(tmpData);
     
-    emailView.setMessageBody('Your log data is below: \n\n' + tmpDataString);
+    // testing GC file format export
+    var tmpDataString = exportGCfile(tmpData);
+    
+    emailView.setMessageBody(tmpDataString);
 
     // this is a huge string
     //Ti.API.info('output string: '+tmpDataString);
@@ -105,11 +110,15 @@ function sendLog(){
         if (e.result == emailView.SENT)
         {
             // TODO: this isn't really necessary, is it?
-            alert("Mail sent.");
+            // alert("Mail sent.");
         }
         else if(e.result == emailView.FAILED)
         {
-            alert("There was a problem. Check your network connection. Debug: "+e.result);
+            var alertDialog = Titanium.UI.createAlertDialog({
+                title: 'Problem',
+                message: 'There was a problem. Check your network connection. DEBUG: '+e.result,
+                buttonNames: ['OK']
+            });
         }
     });
     emailView.open();
@@ -142,7 +151,6 @@ logTable.addEventListener('click',function(e)
     // TODO: organize the data into events
     // inspect each event in the child view
    
-    actInd.show();
 
     // because the android doesn't have a navbar with buttons,
     // use the options dialog (action sheet) to reveal
@@ -180,9 +188,11 @@ logTable.addEventListener('click',function(e)
                 case 1:
                     Ti.API.info('Button 1 pressed.');
                     // email / upload this log
+                    actInd.show();
                     toggleSelection(true);
                     sendLog();
                     toggleSelection(false);
+                    actInd.hide();
                     break;
                 case 2:
                     // delete this log file
@@ -206,7 +216,6 @@ logTable.addEventListener('click',function(e)
 
     });
 
-    actInd.hide();
 
     Ti.API.info('Showing the options dialog');
     optionsDialog.show();
