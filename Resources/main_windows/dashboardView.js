@@ -742,6 +742,21 @@ else
             // change the display to indicate this.
             // Color the heading label differently?
             
+            // just trying something out with feedback
+            // This isn't working, but seems correct.
+            //var limitVibrate = false;
+            // function timeoutVibration() {
+            //     limitVibrate = false;
+            // }           
+            //if(!limitVibrate && trueHeading >=0 && trueHeading%90 < 10) {
+            //    // vibrate the phone at cardinal points
+            //    limitVibrate = true;
+            //    Ti.API.info('Should have vibrated at '+trueHeading+' degrees');
+            //    Titanium.Media.vibrate();	
+            //    setTimeout(timeoutVibration,3000);
+            //}
+
+            
             headingAccuracyLabel.text = accuracy;
             updateHeadingLabel(trueHeading);
             rotateCompass(trueHeading);
@@ -827,6 +842,7 @@ function updateLocationData(e) {
         Titanium.API.info('error:' + JSON.stringify(e.error));
         return;
     }
+    
 
     var longitude = e.coords.longitude;
     var latitude = e.coords.latitude;
@@ -860,12 +876,18 @@ function updateLocationData(e) {
         }
     }
 
+    // can safely limit the precision of the location data
+    // places   degrees distance
+    // 3	    0.001	111 m
+    // 4	    0.0001	11.1 m
+    // 5	    0.00001	1.11 m
+    // 
     // update the current sample object with the new data:
-    currentSample.lat = latitude;
-    currentSample.lon = longitude;
+    currentSample.lat = latitude.toFixed(5);
+    currentSample.lon = longitude.toFixed(5);
     currentSample.alt = altitude;
-    currentSample.locAcc = accuracy;
-    currentSample.altAcc = altitudeAccuracy;
+    currentSample.locAcc = accuracy.toFixed(5);
+    currentSample.altAcc = altitudeAccuracy.toFixed(2);
     currentSample.speed = speed;
     currentSample.timestamp = timestamp;
     currentSample.heading = heading; // TODO: use the heading from the heading callback.
@@ -919,7 +941,7 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     currentSample.accx = parseFloat(acc[0].toFixed(precision));
     currentSample.accy = parseFloat(acc[1].toFixed(precision));
     currentSample.accz = parseFloat(acc[2].toFixed(precision));
-    currentSample.mag = mag;
+    currentSample.mag = mag.toFixed(precision);
 
     // TODO: big movements trigger an immediate recording
     // will this be instantaenous or will a historcal trend need to be recorded?

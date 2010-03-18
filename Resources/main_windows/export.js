@@ -84,7 +84,7 @@ function exportGCfile (data) {
 // speed -> kph         (1 m/s -> 3.6 kph) 
 // timestamp to secs    (cumulative since the start time)
 // distance (km)        (cumulative since the start location. calculate from the coordinates?)
-// len                  (seconds duration between samples)
+// len                  (seconds duration between samples - first sample is key and must be set)
         var thisData = new Object();
         var prevLoc;
         var prevTimestamp;
@@ -123,7 +123,9 @@ function exportGCfile (data) {
         // hack in timestamp sample rate
         if(thisData.len == null){ // in case it's added later
             if(i==0) {
-                thisData.len = 0;
+                // i'm not sure if variable intervals are supported, 
+                // but Golden Cheetah seems to fall back on the first sample for the recording interval
+                thisData.len = 1; 
             } else {
                 thisData.len = ((data[i].timestamp - prevTimestamp)/1000).toFixed(2);
             }
