@@ -13,15 +13,48 @@ Ti.include('../tools/date.format.js');
 // how to handle possibly missing columns? don't allow it?
 // enforce a device-specific schema in the sqlite db?
 // --> primarily for e-mailing?
+// since there is no specific enumeration to the data in the records
+// the columns will have to be constructed by index
+// this would be much easier if the data was just in the database columns.
+// then, a request from the db would be in order.
+
 
 // json export
 // this is used for pushing to couchdb?
 // if each piece of data is expanded into a column in the db,
 // then each will have to be reconstituted into objects / json for sending
+// this will be useful when the database has the data alone.
+function exportCSV (data) {
+    Ti.API.info('Inside CSV export function');
+
+    var headers = [];
+
+    var rows = [];
+    for (var i = 0; i < data.length; i++) {
+        var thisRow = [];
+        for(var datum in data[i]) {
+            // if this 
+            // add this data type to the index
+            var index = headers.indexOf(datum);
+            if(index == -1){
+                headers.push(datum);
+                index = headers.indexOf(datum);
+            }
+            thisRow[index] = data[i][datum];
+        };
+        // add this row to the output
+        rows.push(thisRow.join(', '));
+
+        // what will happen to the first rows, which may be shorter than others?
+    };
+    // add the header row
+    rows.unshift(headers.join(', '));
+    return rows.join('\n');
+}
+
 
 // gc export
 // generate a GoldenCheetah format XML file
-
 /*
 <!DOCTYPE GoldenCheetah>
 <ride>

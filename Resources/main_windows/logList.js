@@ -29,7 +29,10 @@ if(Ti.Platform.name == 'iPhone OS'){
 }
 
 
-function sendLog(){
+function sendLog(format){
+    // format: [json, csv, gc]
+    if(format == null) format = 'csv';
+
     // TODO: invoke an action sheet with options for sending the data
     // at the moment, just back to emailing off an attachment
 
@@ -91,13 +94,27 @@ function sendLog(){
     // ok, now construct the email window
     var emailView = Ti.UI.createEmailDialog();
     emailView.setSubject(' Log data');
+  
+    // export the data in a selected format:
+    var tmpDataString;
+    switch(format) {
+        case 'gc':
+            // testing GC file format export
+            tmpDataString = exportGCfile(tmpData);
+            break;
+        case 'csv':
+            // testing CSV file format export
+            tmpDataString = exportCSV(tmpData);
+            break;
+        case 'josn': 
+        default:
+            // much more robust approach to create a json string
+            tmpDataString = JSON.stringify(tmpData);
+    }
     
+    // naive attempt to create the json string
     //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
-    //var tmpDataString = JSON.stringify(tmpData);
-    
-    // testing GC file format export
-    var tmpDataString = exportGCfile(tmpData);
-    
+   
     emailView.setMessageBody(tmpDataString);
 
     // this is a huge string
@@ -128,6 +145,7 @@ function sendLog(){
 
 //b.addEventListener('click',sendLog());
 
+/*
 if(Ti.Platform.name == 'iPhone OS'){
     win.rightNavButton = b;
     rightnav = true;
@@ -135,6 +153,8 @@ if(Ti.Platform.name == 'iPhone OS'){
     // TODO: figure out a solution for android
     // Menu?
 }
+*/
+
 
 // this isn't being used at the moment
 // TODO: add an activity meter.

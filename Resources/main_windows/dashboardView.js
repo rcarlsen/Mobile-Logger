@@ -5,6 +5,30 @@ Ti.include('../tools/util.js');
 // reference the parent window
 var win = Ti.UI.currentWindow;
 
+// set up a listener to act every time the window is loaded
+win.addEventListener('focus',function() {
+    Ti.API.info('Dashboard focus event');
+    setUnits();
+
+    // set the audio monitoring state
+    // iPhone only?
+    if(Ti.Platform.name == 'iPhone OS') {
+        setAudioMonitoring();
+    }
+});
+
+function setLoggingState(state) {
+    // set the preferences
+    // the application should *always* have the loggingState false
+    // when it launches. otherwise, it may ahve shut down incorrectly.
+    // if so, perhaps we should prompt to resume logging.
+    // however, if the auto-resume feature is set, what to do then?
+    // should the auto-resume only activate in startLogging()?
+    //
+    // what needs to happen to resume the previous log?
+    // - get the previous eventid
+    //  - query the database? store the current eventid in an app property?
+}
 /*// toggle the display*/
 //win.addEventListener('twofingertap',function(e){
     //toggleDisplayVisibility();
@@ -12,7 +36,6 @@ var win = Ti.UI.currentWindow;
 
 // set up some instance vars:
 var loggingState = false; // toggle this when recording
-// should this be a property, or something not tied to this class?
 
 var eventID;
 var currentSample = new Object();
@@ -24,7 +47,40 @@ var eventStartDate;
 var clockInterval = 0;
 var audioListenerInterval = 0;
 
-var distanceUnits = "Miles";
+// set up configuration for metric or imperial
+// data should *always* be stored in metric / meters
+// this configuration will only affect display
+var distanceUnits;
+var distanceUnitValue;
+var speedUnits;
+var speedUnitValue;
+
+function setUnits () {
+    Ti.API.info('Setting units preferences.');
+
+    // retrieve the unit preference
+    // use inperial units by default
+    if(Ti.App.Properties.getBool('useMetric',false)) {
+        distanceUnits = "Kilometers";
+        speedUnits = 'KPH';
+
+        distanceUnitValue = 0.001; //m -> km
+        speedUnitValue = 3.6; // m/s -> M/hr
+    } else {
+        distanceUnits = "Miles";
+        speedUnits = 'MPH';
+
+        //1 meter = 0.000621371192 miles
+        distanceUnitValue = 0.000621371192; // m -> mile
+        speedUnitValue = 2.236936; // m/s -> M/hr
+    }
+
+    // need to update all the labels which use these values
+    updateSpeedLabel();
+    speedUnitLabel.text = speedUnits;
+    updateDistanceLabel();
+    distanceUnitLabel.text = distanceUnits;
+}
 // end instance vars //
 
 var dashboardView = Ti.UI.createView({
@@ -93,7 +149,7 @@ var speedUnitLabel = Ti.UI.createLabel({
     textAlign:'center',
     height:'auto',
     top:125,
-    text:'MPH'
+    text:speedUnits
 });
 
 
@@ -263,7 +319,9 @@ var audioLevelLabel = Ti.UI.createLabel({
 audioLevelImage.add(audioLevelLabel);
 
 
-function resetValues () {
+function resetValues (restore) {
+    // if restore is true, then get the last data from the db? 
+
     // reset the necessary ivars
     currentSample = new Object();
     eventDistance = 0;
@@ -282,7 +340,16 @@ function startLogging() {
 
     // open the database connection (create if necessary)
     logDB = Ti.Database.open("log.db");
-    logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+    
+    // access (create if necessary) the meta table
+    // this table contains the event id, start time, duration, distance, tags/notes
+    // some of these fields are set when stopping the log
+    logDB.execute('CREATE TABLE IF NOT EXISTS LOGMETA (id INTEGER PRIMARY KEY, eventid TEXT, startdate INTEGER, duration INTEGER, distance REAL, tags TEXT, userid TEXT)');
+    
+    // access (create if necessary) the log data table
+    // shares the id field with the meta table
+    //logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (id INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+    logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (id INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
     logDB.close();
 
     // (re)set variables for this new event
@@ -323,6 +390,10 @@ function stopLogging() {
 };
 
 function recordSample() {
+    // get audio levels. will just record -1 if off
+    // testing to see if the frequent audio updates are causing a crash
+    checkAudioLevels();
+
     // get the current time
     currentSample.timestamp = new Date().getTime();
 
@@ -330,22 +401,19 @@ function recordSample() {
     Titanium.API.info('Time: '+currentSample.timestamp);
 
     logDB = Ti.Database.open("log.db");
+    
+    // insert the current sample in the logdata table
     logDB.execute('INSERT INTO LOGDATA VALUES(NULL,?,?)',eventID,JSON.stringify(currentSample));
+    
+    // insert updated meta data into logmeta table
+    // specifically, eventDistance, duration
+    // TODO: finish the meta table
+
     logDB.close();
 
     // pulse red while recording
     animateLocationView();
 
-//  this is neat, but it messes up the rotation animation
-//  the heartbeat animation would be great for another widget.
-//	// animate compass
-//	var t = Titanium.UI.create2DMatrix();
-//	t = t.scale(1.1);
-//	compass.animate({transform:t, duration:100},function()
-//	{
-//		var t = Titanium.UI.create2DMatrix();
-//		compass.animate({transform:t, duration:200});
-//	});
 };
 // end logging methods//
 
@@ -437,10 +505,13 @@ dashboardView.add(audioLevelImage);
 Ti.UI.currentWindow.add(dashboardView);
 
 function updateSpeedLabel (speed) {
-    speedlabel.text = (2.236936 * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
+    if(speed == null) speed = 0;
+    speedlabel.text = (speedUnitValue * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 }
 
 function updateHeadingLabel(heading) {
+    if(heading == null) return;
+    
     // this is needed to append the degree symbol to the heading label
     headingLabel.text = parseInt(heading) + "\u00B0";
 }
@@ -523,14 +594,9 @@ function toggleDisplayVisibility (state) {
 
 }
 
-// testing
-var dummyDistIncrementInterval;
-//dummyDistIncrementInterval = setInterval(dummyDist,1000);
-function dummyDist() {
-    updateDistanceLabel(1);
-}
 
 function updateDistanceLabel (delta) {
+    if(delta == null) delta = 0;
     // expects a ivar with the current distance
     eventDistance += delta;
 
@@ -539,7 +605,7 @@ function updateDistanceLabel (delta) {
 
     // convert the meters to an appropriate display unit. (miles only for now)
     // 1 meter = 0.000621371192 miles
-    var displayDistance = eventDistance * 0.000621371192; // miles
+    var displayDistance = eventDistance * distanceUnitValue; // miles
     //var displayDistance = eventDistance;
 
     Ti.API.info('Display distance: '+displayDistance);
@@ -617,6 +683,12 @@ function checkAudioLevels() {
 }
 
 function setAudioMonitoring (state) {
+    if(state == null) {
+        state = Ti.App.Properties.getBool('monitorSound',false);
+    } else {
+        Ti.App.Properties.setBool('monitorSound',state);
+    }
+
     if(state == true) {
         Ti.Media.startMicrophoneMonitor();
         audioListenerInterval = setInterval(checkAudioLevels,300);
@@ -630,15 +702,10 @@ function setAudioMonitoring (state) {
     }
 }
 
-// Enable audio monitoring by default
-// TODO: add a user preference and store it as a property
-// iPhone only?
-if(Ti.Platform.name == 'iPhone OS') {
-    setAudioMonitoring(true);
-}
+
 
 function rotateCompass(degrees) {
-// cloud 1 animation/transform
+    // cloud 1 animation/transform
 	// don't interrupt the current animation
     if(compass.animating) {return;}
     
@@ -649,7 +716,7 @@ function rotateCompass(degrees) {
 	a.transform = t;
 	a.duration = 100;
 	a.autoreverse = false;
-	//a.repeat = 0;
+	a.repeat = 0;
 	compass.animate(a); // TODO: rotate a compass widget instead
 }
 
@@ -658,33 +725,24 @@ function rotateCompass(degrees) {
 // for now, let's make this monolithic to get the ball rolling.
 //
 // geolocation:
-//
 //  SHOW CUSTOM ALERT IF DEVICE HAS GEO TURNED OFF
-//
 if (Titanium.Geolocation.locationServicesEnabled==false)
 {
 	Titanium.UI.createAlertDialog({title:'Location Service', message:'Your device has location services turned off - turn it on to continue.'}).show();
 }
 else
 {
-	//
 	// IF WE HAVE COMPASS GET THE HEADING
-	//
 	if (Titanium.Geolocation.hasCompass)
 	{
-		//
 		//  TURN OFF ANNOYING COMPASS INTERFERENCE MESSAGE
-		//
 		Titanium.Geolocation.showCalibration = false;
 
-		//
 		// SET THE HEADING FILTER (THIS IS IN DEGREES OF ANGLE CHANGE)
 		// EVENT WON'T FIRE UNLESS ANGLE CHANGE EXCEEDS THIS VALUE
 		Titanium.Geolocation.headingFilter = 2;
 
-		//
 		//  GET CURRENT HEADING - THIS FIRES ONCE
-		//
 		Ti.Geolocation.getCurrentHeading(function(e)
 		{
 			if (e.error)
@@ -726,17 +784,6 @@ else
 			var accuracy = e.heading.accuracy;
 			var trueHeading = e.heading.trueHeading;
 			var timestamp = e.heading.timestamp;
-
-//			updatedHeading.text = 'x:' + x + ' y: ' + y + ' z:' + z;
-//			updatedHeadingTime.text = 'timestamp:' + new Date(timestamp);
-//			updatedHeading.color = 'red';
-//			updatedHeadingTime.color = 'red';
-//			setTimeout(function()
-//			{
-//				updatedHeading.color = '#444';
-//				updatedHeadingTime.color = '#444';
-//				
-//			},100);
 	        
             // if the accuracy is negative, then the heading is invalid
             // change the display to indicate this.
@@ -769,7 +816,6 @@ else
 		Titanium.API.info("No Compass on device");
 	}
 
-	//
 	//  SET ACCURACY - THE FOLLOWING VALUES ARE SUPPORTED
 	//
 	// Titanium.Geolocation.ACCURACY_BEST
@@ -781,14 +827,9 @@ else
 	Titanium.Geolocation.accuracy = Titanium.Geolocation.ACCURACY_BEST;
 
 	//
-	//  SET DISTANCE FILTER.  THIS DICTATES HOW OFTEN AN EVENT FIRES BASED ON THE DISTANCE THE DEVICE MOVES
-	//  THIS VALUE IS IN METERS
-	//
 	Titanium.Geolocation.distanceFilter = 1;
 
-	//
 	// GET CURRENT POSITION - THIS FIRES ONCE
-	//
 	Titanium.Geolocation.getCurrentPosition(function(e)
 	{
         updateLocationData(e);	
@@ -796,31 +837,11 @@ else
 		//Titanium.API.info('geo - current location: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
 	});
 
-	//
 	// EVENT LISTENER FOR GEO EVENTS - THIS WILL FIRE REPEATEDLY (BASED ON DISTANCE FILTER)
-	//
 	Titanium.Geolocation.addEventListener('location',function(e)
 	{
         updateLocationData(e);
 
-//		updatedLocation.text = 'long:' + longitude;
-//		updatedLatitude.text = 'lat: '+ latitude;
-//		updatedLocationAccuracy.text = 'accuracy:' + accuracy;
-//		updatedLocationTime.text = 'timestamp:' +new Date(timestamp);
-//
-//		updatedLatitude.color = 'red';
-//		updatedLocation.color = 'red';
-//		updatedLocationAccuracy.color = 'red';
-//		updatedLocationTime.color = 'red';
-//		setTimeout(function()
-//		{
-//			updatedLatitude.color = '#444';
-//			updatedLocation.color = '#444';
-//			updatedLocationAccuracy.color = '#444';
-//			updatedLocationTime.color = '#444';
-//			
-//		},100);
-		
 //		// reverse geo
 //		Titanium.Geolocation.reverseGeocoder(latitude,longitude,function(evt)
 //		{
@@ -888,7 +909,7 @@ function updateLocationData(e) {
     currentSample.alt = altitude;
     currentSample.locAcc = accuracy.toFixed(5);
     currentSample.altAcc = altitudeAccuracy.toFixed(2);
-    currentSample.speed = speed;
+    currentSample.speed = speed.toFixed(2);
     currentSample.timestamp = timestamp;
     currentSample.heading = heading; // TODO: use the heading from the heading callback.
 };
@@ -941,7 +962,7 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     currentSample.accx = parseFloat(acc[0].toFixed(precision));
     currentSample.accy = parseFloat(acc[1].toFixed(precision));
     currentSample.accz = parseFloat(acc[2].toFixed(precision));
-    currentSample.mag = mag.toFixed(precision);
+    currentSample.mag = parseFloat(mag.toFixed(precision));
 
     // TODO: big movements trigger an immediate recording
     // will this be instantaenous or will a historcal trend need to be recorded?
