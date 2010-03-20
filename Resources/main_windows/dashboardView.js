@@ -17,6 +17,14 @@ win.addEventListener('focus',function() {
     }
 });
 
+win.addEventListener('open',function() {
+    // is this the first event to trigger?
+    // if not, the setup needs to happen first.
+    // maybe in app.js.
+    Ti.API.info('In the window open event. About to setup DB.');
+    setupDatabase();
+});
+
 function setLoggingState(state) {
     // set the preferences
     // the application should *always* have the loggingState false
@@ -29,6 +37,9 @@ function setLoggingState(state) {
     // - get the previous eventid
     //  - query the database? store the current eventid in an app property?
 }
+
+
+
 /*// toggle the display*/
 //win.addEventListener('twofingertap',function(e){
     //toggleDisplayVisibility();
@@ -37,13 +48,15 @@ function setLoggingState(state) {
 // set up some instance vars:
 var loggingState = false; // toggle this when recording
 
-var eventID;
 var currentSample = new Object();
+var eventID;
+var logID;
+//var logDB;
 var loggingInterval = 0;
-var logDB;
 
 var eventDistance = 0;
 var eventStartDate;
+var eventDuration = 0;
 var clockInterval = 0;
 var audioListenerInterval = 0;
 
@@ -90,15 +103,6 @@ var dashboardView = Ti.UI.createView({
 });
 
 
-//var statusLabel = Ti.UI.createLabel({
-//    top:10,
-//    left:10,
-//    text:'status messages'
-//});
-//
-//dashboardView.add(statusLabel);
-
-
 // toggle switch for enabling logging
 var loggingSwitch = Titanium.UI.createSwitch({
     top:30,right:10,
@@ -134,6 +138,13 @@ var accLabel = Ti.UI.createLabel({
 // using text in the canvas doesn't seem supported at the moment on mobile safari
 // i can't determine if the TIUICanvas (listed in the bleeding edge code) has
 // actually been implemented and/or is cross-platform.
+//// Testing to see if the canvas view exists
+//var canvas = Ti.UI.createCanvasView({});
+//Ti.include("dashboard.js");
+//var dash = new Dashboard(canvas.getContext());
+//dashboardView.add(canvas);
+//
+
 var speedlabel = Titanium.UI.createLabel({
 	color:'#333',
 	text:'0.0',
@@ -178,13 +189,6 @@ var accuracyLabel = Ti.UI.createLabel({
     height:'auto',
     bottom:120
 });
-
-//// Testing to see if the canvas view exists
-//var canvas = Ti.UI.createCanvasView({});
-//Ti.include("dashboard.js");
-//var dash = new Dashboard(canvas.getContext());
-//dashboardView.add(canvas);
-//
 
 var compassView = Ti.UI.createView({
     width:320,height:200,
@@ -320,41 +324,113 @@ audioLevelImage.add(audioLevelLabel);
 
 
 function resetValues (restore) {
-    // if restore is true, then get the last data from the db? 
+    if(restore == null) restore = false;
+    Ti.API.info('In the resetValues() method');
 
-    // reset the necessary ivars
-    currentSample = new Object();
-    eventDistance = 0;
-    eventStartDate = new Date();
-    eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
+    // if restore is true, then get the last data from the db? 
+    // otherwise, create a new row in the logmeta table
+    var logDB = Ti.Database.open("log.db");
+    Ti.API.info('Opened log.db');
+
+    // create a hash for this device / user
+    deviceID =  Titanium.Utils.md5HexDigest(Ti.Platform.id);
+    Ti.API.info('Set device ID: '+deviceID);
+
+    if(restore == false) {
+        Ti.API.info('Creating a new event log.');
+        // create a new event
+        eventDistance = 0;
+        eventStartDate = new Date();
+        eventDuration = 0;
+        eventID = Titanium.Utils.md5HexDigest(eventStartDate.toUTCString());
+
+        logDB.execute('INSERT INTO LOGMETA (eventid,startdate,duration,distance,deviceid) VALUES(?,?,?,?,?)',eventID,eventStartDate.getTime()/1000,0,eventDistance,deviceID); // sqlite INTEGER only supports seconds not millis
+        Ti.API.info('Inserted the new event into the DB.');
+
+        // get the newly created id field
+        var rows = logDB.execute('SELECT id from LOGMETA WHERE eventid = ?',eventID);
+        Ti.API.info('Queried LOGMETA for id of eventid: '+eventID);
+
+        if(rows.isValidRow()){ // should only return one row
+            logID = rows.fieldByName('id');
+            Ti.API.info('logID: '+logID);
+        
+        } else {
+            alert('There was a problem creating a new event log.');
+            // this is mostly for debugging
+            rows.close();
+            return false; // tell the calling method (startLogging) to *not* start
+        }
+        rows.close();
+        Ti.API.info('Closed the ResultSet');
+    } else {
+        Ti.API.info('Retrieving the past event');
+
+        // retrieve the last event and continue logging.
+        var rows = logDB.execute('SELECT id,eventid,startdate,duration,distance FROM LOGMETA ORDER BY startdate DESC LIMIT 1');
+        Ti.API.info('Queried the DB for the most recent event');
+
+        if(rows.isValidRow()){
+            eventDistance = rows.fieldByName('distance');
+            eventStartDate = new Date(rows.fieldByName('startdate')*1000);
+            eventDuration = rows.fieldByName('duration');
+            eventID = rows.fieldByName('eventid');
+            logID = rows.fieldByName('id');
+            
+            Ti.API.info('Got last event with eventid: '+eventID+', and startdate: '+eventStartDate);
+        } else {
+            alert('There was a problem retrieving the previous event');
+            rows.close();
+            return false;
+            // TODO: need to have a way to determine if there are any events stored.
+        }
+        rows.close();
+        Ti.API.info('Closed the resultSet');
+    }
+    logDB.close();
+    Ti.API.info('Closed the log.db in the resetValues() method');
+
+   return true; 
 }
 
-// logging methods
-function startLogging() {
-    Ti.API.info("Inside the startLogging() method");
 
-    // TODO: this method should populate a new row in the meta table
-    // this table will contain the eventID, startdate/time, tags, notes, userID, et al.
-    // the logdata table contain the actual samples, using a primary key...perhaps the eventID?
-    // or this could be done traditionally, with a lookup.
-
+// to be run each time the application starts
+// ensures that the database is ready for access
+function setupDatabase() {
     // open the database connection (create if necessary)
-    logDB = Ti.Database.open("log.db");
-    
+    var logDB = Ti.Database.open("log.db");
+    Ti.API.info('Opened (or created) log.db');
+
     // access (create if necessary) the meta table
     // this table contains the event id, start time, duration, distance, tags/notes
     // some of these fields are set when stopping the log
-    logDB.execute('CREATE TABLE IF NOT EXISTS LOGMETA (id INTEGER PRIMARY KEY, eventid TEXT, startdate INTEGER, duration INTEGER, distance REAL, tags TEXT, userid TEXT)');
-    
+    logDB.execute('CREATE TABLE IF NOT EXISTS LOGMETA (id INTEGER PRIMARY KEY, eventid TEXT, startdate INTEGER, duration INTEGER, distance REAL, tags TEXT, deviceid TEXT)');
+    Ti.API.info('Created LOGMETA table');
+
     // access (create if necessary) the log data table
     // shares the id field with the meta table
     //logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (id INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
-    logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (id INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+    logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA  (id INTEGER, DATA TEXT)');
+    Ti.API.info('Created LOGDATA table');
+    
     logDB.close();
+    Ti.API.info('Closed log.db');
+}
+
+// logging methods
+function startLogging(restore) {
+    if(restore == null) restore = false; // start a new log
+
+    Ti.API.info("Inside the startLogging() method");
+    Ti.API.info('Continue (restore) old log: '+restore);
 
     // (re)set variables for this new event
-    resetValues();
-    currentSample.eventID = eventID;
+    // if something went wrong get out of here, don't start to logging timers
+    if(!resetValues(restore)) return false;
+    Ti.API.info('Returned from resetValues()');
+
+    currentSample = new Object();
+    currentSample.logID = logID;
 
     loggingState = true;
     
@@ -362,7 +438,9 @@ function startLogging() {
     if (Titanium.Geolocation.locationServicesEnabled==true) {
         Ti.Geolocation.getCurrentPosition(function(e){updateLocationData(e);});
     }
-
+    // the first few samples don't seem to have location data
+    // does the first recording after the currentSample is cleared 
+    // need to be delayed for a few moments to allow for a fix?
     loggingInterval = setInterval(recordSample,1000);
 
     // start a timer for the clock update
@@ -372,6 +450,8 @@ function startLogging() {
     Ti.App.idleTimerDisabled = true;
 
     Ti.API.info("Finished the startLogging() method");
+
+    return true;
 };
 
 function stopLogging() {
@@ -397,23 +477,25 @@ function recordSample() {
     // get the current time
     currentSample.timestamp = new Date().getTime();
 
-    Titanium.API.info("Current sample recorded to db");
-    Titanium.API.info('Time: '+currentSample.timestamp);
+    var logDB = Ti.Database.open("log.db");
+    Ti.API.info('Opened log.db');
 
-    logDB = Ti.Database.open("log.db");
-    
     // insert the current sample in the logdata table
-    logDB.execute('INSERT INTO LOGDATA VALUES(NULL,?,?)',eventID,JSON.stringify(currentSample));
-    
+    logDB.execute('INSERT INTO LOGDATA (id,data) VALUES(?,?)',logID,JSON.stringify(currentSample));
+    Ti.API.info('Inserted sample into LOGDATA with logID: '+logID);
+
     // insert updated meta data into logmeta table
-    // specifically, eventDistance, duration
-    // TODO: finish the meta table
+    logDB.execute('UPDATE LOGMETA SET distance = ? , duration = ? WHERE eventid = ?',eventDistance,eventDuration,eventID);
+    Ti.API.info('Updated LOGMETA for eventID: '+eventID);
 
     logDB.close();
+    Ti.API.info('Closed log.db');
 
     // pulse red while recording
     animateLocationView();
 
+    Titanium.API.info("Current sample recorded to db");
+    Titanium.API.info('Time: '+currentSample.timestamp);
 };
 // end logging methods//
 
@@ -433,7 +515,11 @@ loggingSwitch.addEventListener('change',function(e) {
         return;
     }
 
-    if(e.value == false) {
+    if(e.value == false && loggingState == true) { 
+        // added the loggingState bit to help prevent a double alert 
+        // when programatically setting the switch value to false 
+        // (eg. in the event of an error)
+        //
         // ask to stop logging
         var alertDialog = Titanium.UI.createAlertDialog({
             title: 'Stop Logging',
@@ -454,32 +540,59 @@ loggingSwitch.addEventListener('change',function(e) {
 
     } else if(loggingState==false) { // don't start a new log if we're already logging
         Titanium.API.info("Logging switch activated");
-        startLogging();
 
-        // prompt to begin logging
-        // TODO: check if there is a recent log and ask to extend that log.
-/*        var alertDialog1 = Titanium.UI.createAlertDialog({*/
-            //title: 'Enable Logging',
-            //message: 'Click ok to begin logging.',
-            //buttonNames: ['OK','Cancel']
-        //});
-        //alertDialog1.addEventListener('click',function(e,sw) {
-            //// here is where to parse the response
-                //// debugging
-                ////Titanium.API.debug(e);
-                ////statusLabel.text = 'event: '+e.index;
-                ////loggingState = true;
+        var logDB = Ti.Database.open("log.db");
+        Ti.API.info('Opened log.db in loggingSwitch()');
 
-            //if(e.index == 0) {
-                //// TODO: implement actual logic here
-                //loggingState = true;
-            //} else {
-                //// the cancel button was pressed, restore the button state
-                //sw.value = false;
-            //}
-        //});
+        var rows = logDB.execute('SELECT eventid,startdate FROM LOGMETA');
+        Ti.API.info('Queried LOGMETA for event list');
 
-        /*alertDialog1.show();   */
+        var eventCount = rows.rowCount;
+
+        rows.close();
+        Ti.API.info('Closed the resultSet in loggingSwitch. row count: '+eventCount);
+        
+        logDB.close();
+        Ti.API.info('Closed log.db');
+
+        if(eventCount > 0) {
+            Ti.API.info('row count > 0');
+
+            // there is at least one stored event, so prompt to continue it
+            // TODO: use some logic on the startdate and current time to determine if we should prompt to continue.
+
+            var alertDialog1 = Titanium.UI.createAlertDialog({
+                title: 'Continue Log',
+                message: 'Continue the previous log or begin new?',
+                buttonNames: ['Continue','New']
+            });
+            alertDialog1.addEventListener('click',function(e,sw) {
+                // here is where to parse the response
+                //
+                // If there was a problem with starting the log
+                // indicate that it's not recording
+                // TODO: i recall that there was a problem with the switch change event
+                // causing trouble.
+                //
+                if(e.index == 0) {
+                    // continue the previous log
+                    var result = startLogging(true);
+                    if(result == false) sw.value = false;
+                } else {
+                    // start a new log
+                    var result = startLogging(false);
+                    if(result == false) sw.value = false;
+                }
+            });
+
+            alertDialog1.show();   
+        } else {
+            Ti.API.info('row count <= 0. call startLogging() for a new event');
+            var result = startLogging();
+            Ti.API.info('Result of startLogging(): '+ result);
+            if(!result) sw.value = false;
+        }
+
     }
 
 });
@@ -534,6 +647,7 @@ function updateClock() {
     // use the recorded start time and current time to set a clock display
     var currentTime = new Date().getTime();
     var duration = currentTime - eventStartDate.getTime(); // millis
+    eventDuration = duration;
 
     var hour = Math.floor(duration / 1000 / 60 / 60);
     var min = Math.floor(duration / 1000 / 60) % 60;

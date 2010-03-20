@@ -66,10 +66,21 @@ function sendLog(format){
     Ti.API.info('Selected Events list: '+eventListArray.join());
     var eventList = eventListArray.join();
     
+
     // i think that each of these items needs to be surrounded by quotes
     //var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID IN (?)',eventList);
-    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID = ?',eventListArray[0]);
-    
+    //var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID = ?',eventListArray[0]);
+    var rows = logDB.execute('SELECT * FROM LOGMETA WHERE EVENTID = ?',eventListArray[0]);
+    var id = rows.fieldByName('id');
+
+    // also want to insert the event and device id into the exported data:
+    var eventID = rows.fieldByName('eventid');
+    var deviceID = rows.fieldByName('deviceid');
+
+    rows.close();
+
+
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ?',id);    
     // the rowCount seems to be limited to 1000 rows. why?
     // The problem seems alleviated after two changes:
     // 1. commented out the getRowCount() call.
@@ -82,8 +93,13 @@ function sendLog(format){
     // TODO: group the rows by eventID
     var tmpData=[];
     while(1){
-        var thisData = rows.fieldByName('DATA');
-        tmpData.push(JSON.parse(thisData));
+        var thisData = JSON.parse(rows.fieldByName('DATA'));
+        
+        // insert the extra fields:
+        thisData.eventID = eventID;
+        thisData.deviceID = deviceID;
+
+        tmpData.push(thisData);
         if(rows.next() == false) break;
     };
     rows.close();
@@ -247,7 +263,7 @@ logTable.addEventListener('click',function(e)
 		});
 
         var sample = Ti.UI.createTextArea({
-            value:e.rowData.content,
+            value:e.rowData.timestamp, //content,
             height:300,
             width:300,
             top:10,
@@ -326,10 +342,17 @@ function deleteEvent(eventID) {
             // open the DB
             var logDB = Ti.Database.open("log.db");
 
-            // run the SQL statement to delete the row.
-            logDB.execute('DELETE FROM LOGDATA WHERE EVENTID = ?',eventID);
 
+
+            // run the SQL statement to delete the row.
+            var rows = logDB.execute('SELECT id FROM LOGMETA WHERE eventid = ?',eventID);
+            var id = rows.fieldByName('id');
+            rows.close();
+
+            logDB.execute('DELETE FROM LOGDATA WHERE id = ?',id);
+            logDB.execute('DELETE FROM LOGMETA WHERE id = ?',id);
             // is there a way to verify the process?
+
             logDB.close();
            
             Ti.API.info('deleted eventID: '+eventID);
@@ -355,10 +378,15 @@ function loadLogs () {
 
     Ti.API.info('Getting logs from db');
 
-    // TODO: move the data base stuff into a class.
-    logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
 
-    var rows = logDB.execute('SELECT * FROM LOGDATA GROUP BY EVENTID');
+    // TODO: move the data base stuff into a class.
+    
+    // this should be streated by the setupDatabase() method
+    //logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+
+    //var rows = logDB.execute('SELECT * FROM LOGDATA GROUP BY EVENTID');
+    var rows = logDB.execute('SELECT * FROM LOGMETA ORDER BY startdate DESC');
+
     //Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
     
     // TODO: group the rows by eventID
@@ -368,13 +396,14 @@ function loadLogs () {
 
     if(rows.getRowCount() > 0) {
         while(rows.isValidRow()){
-            var thisData = rows.fieldByName('DATA');
-            var thisObject = JSON.parse(thisData);
+            //var thisData = rows.fieldByName('DATA');
+            //var thisObject = JSON.parse(thisData);
+            var thisTimestamp = rows.fieldByName('startdate');
 
-            var rowParams = {   title:new Date(thisObject.timestamp).toLocaleString(),
-                                eventID:rows.fieldByName('EVENTID'),
-                                content:thisData,
-                                timestamp:thisObject.timestamp};
+            var rowParams = {   title:new Date(thisTimestamp*1000).toLocaleString(), // only stored as seconds
+                                eventID:rows.fieldByName('eventid'),
+                                content:null,
+                                timestamp:thisTimestamp};
 
             /* // notes on creating custom row layouts
             row = Ti.UI.createTableViewRow();
@@ -402,7 +431,7 @@ function loadLogs () {
     logDB.close();
 
     // sort chronolocically:
-    tmpData.sort(compareTime);
+    //tmpData.sort(compareTime);
 
     Ti.API.info('Got '+tmpData.length+' events');
     Ti.API.info('Selected events: '+selectedEvents);

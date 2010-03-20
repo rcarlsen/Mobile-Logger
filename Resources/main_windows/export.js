@@ -40,7 +40,13 @@ function exportCSV (data) {
                 headers.push(datum);
                 index = headers.indexOf(datum);
             }
-            thisRow[index] = data[i][datum];
+
+            // respect the user preference to omit the device ID
+            if(datum == 'deviceID' && Ti.App.Properties.getBool('omitDeviceID',false)) {
+                thisRow[index] = -1;
+            } else {
+                thisRow[index] = data[i][datum];
+            }
         };
         // add this row to the output
         rows.push(thisRow.join(', '));

@@ -18,6 +18,11 @@ inputData.push(resumeRow);
 inputData.push(addControlRow('Metric Units','useMetric'));
 inputData.push(addControlRow('Monitor Sound Levels','monitorSound',false));
 
+// should this actually modify the stored data in the db,
+// or control whether or not the user ID field is included
+// in uploaded or exported data?
+inputData.push(addControlRow('Anonymous Log','omitDeviceID',false));
+
 function addControlRow(label,property,initialValue)
 {
     if(initialValue == null) initialValue = false;
