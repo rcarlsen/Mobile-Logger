@@ -472,7 +472,8 @@ function stopLogging() {
 function recordSample() {
     // get audio levels. will just record -1 if off
     // testing to see if the frequent audio updates are causing a crash
-    checkAudioLevels();
+    // using the timer method again. disable this to not double call the audio checking.
+    //checkAudioLevels();
 
     // get the current time
     currentSample.timestamp = new Date().getTime();

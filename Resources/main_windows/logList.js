@@ -3,6 +3,7 @@
 
 Ti.include('../tools/json2.js');
 Ti.include('export.js');
+Ti.include('../tools/date.format.js');
 
 var win = Ti.UI.currentWindow;
 
@@ -76,9 +77,12 @@ function sendLog(format){
     // also want to insert the event and device id into the exported data:
     var eventID = rows.fieldByName('eventid');
     var deviceID = rows.fieldByName('deviceid');
+    var startDate =  rows.fieldByName('startdate');
 
     rows.close();
 
+    // convert to a Date object
+    startDate = new Date(startDate*1000);
 
     rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ?',id);    
     // the rowCount seems to be limited to 1000 rows. why?
@@ -122,7 +126,7 @@ function sendLog(format){
             // testing CSV file format export
             tmpDataString = exportCSV(tmpData);
             break;
-        case 'josn': 
+        case 'json': 
         default:
             // much more robust approach to create a json string
             tmpDataString = JSON.stringify(tmpData);
@@ -130,13 +134,48 @@ function sendLog(format){
     
     // naive attempt to create the json string
     //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
-   
-    emailView.setMessageBody(tmpDataString);
 
+
+    // TODO: add as a file attachment, rather than a string.
+    // emailView.setMessageBody(tmpDataString);
+    emailView.setMessageBody('Log file attached in '+format+' format.');
+    
     // this is a huge string
     //Ti.API.info('output string: '+tmpDataString);
 
-    // emailView.addAttachment(tmpDataString);
+    // Save the data as a temp file, the attach to an e-mail:
+    // So this all works...for now. Maybe they'll change the 
+    // methods in a future release.
+    // For the moment, though...does the temp dir clear itself?
+    var tempFile = Ti.Filesystem.createTempFile();
+    Ti.API.info('Created temp file: '+tempFile.toString());
+   
+    // construct a filename based on the date
+    // TODO: look to see if the log has already been exported?
+    // what about a log that has had more data added to it?
+    // There has to be a better way to replace these strings or to build the name.
+    var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
+    Ti.API.info(dateString);
+    var outfilename = '/Log_'+dateString+'.'+format;
+
+    var result = tempFile.rename(tempFile.getParent()+outfilename);
+    Ti.API.info('move result: '+result);
+    Ti.API.info('renamed the temp file to: '+tempFile.name);
+
+    tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
+    tempFile.write(tmpDataString);
+    Ti.API.info('wrote to temp log file: '+tempFile.resolve());
+
+    //var tempContents = tempFile.read();
+    //Ti.API.info('temp file contents: '+tempContents.text);
+
+    // Do we need to clean up after ourselves?
+    // Does the filesystem clean up the temp dir?
+    //tempFile.deleteFile();
+    //Ti.API.info('deleted temp file at: '+tempFile.resolve());
+   
+    // Add the log as an attachment to the e-mail message
+    emailView.addAttachment(tempFile);
 
     emailView.addEventListener('complete',function(e)
     {
@@ -366,7 +405,49 @@ function deleteEvent(eventID) {
 
 };
 
+/*
+function addLogRow(label,property,initialValue)
+{
+    if(initialValue == null) initialValue = false;
 
+	var row = Ti.UI.createTableViewRow({height:50});
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:16,fontWeight:'bold'},
+        left:10
+    });
+    row.add(cellLabel);
+
+    // enable the property to be omitted
+    // TODO: use a type variable to create different styles of controls?
+    if(property != null){
+        // add a switch to the right
+        var sw = Ti.UI.createSwitch({
+            right:10,
+            value:Ti.App.Properties.getBool(property,initialValue)
+        });
+
+        // add a callback function to set application
+        // properties when the value is changed
+        sw.addEventListener('change', function(e)
+        {
+            // update the property with the state of the switch
+            Ti.App.Properties.setBool(property,e.value);
+
+            Ti.API.info('Property changed: '+property+', '+e.value);
+        });
+
+        row.add(sw);
+
+	}
+
+	row.className = 'control';
+	return row;
+}
+*/
 
 // call up the log list from the database
 function loadLogs () {
