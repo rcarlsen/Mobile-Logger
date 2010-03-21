@@ -14,6 +14,7 @@ if(Ti.Platform.name == 'iPhone OS') {
     //actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
     actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.DARK;
 }
+actInd.zIndex = 100; // trying to bring this to the front
 win.add(actInd);
 
 
@@ -301,8 +302,10 @@ logTable.addEventListener('click',function(e)
             backgroundColor:'#ddd'
 		});
 
+        // TODO: layout a nice summary page
+        // Include a map to plot the ride?
         var sample = Ti.UI.createTextArea({
-            value:e.rowData.timestamp, //content,
+            value:e.rowData.logID +' / '+e.rowData.eventID, //content,
             height:300,
             width:300,
             top:10,
@@ -405,49 +408,93 @@ function deleteEvent(eventID) {
 
 };
 
-/*
-function addLogRow(label,property,initialValue)
-{
-    if(initialValue == null) initialValue = false;
 
-	var row = Ti.UI.createTableViewRow({height:50});
+// simple padding function
+function pad2(number) {
+     return (number < 10 ? '0' : '') + number   
+}
+
+
+function addLogRow(rowData) // should include title(date), duration, distance, eventID/logID (for detail view) 
+{
+    Ti.API.info('In the addLogRow() method');
+    
+    if(rowData == null) return null;
+
+	var row = Ti.UI.createTableViewRow({height:55});
+    Ti.API.info('Created a new row object');
 
     // add a label to the left
     // should be bold
     var cellLabel = Ti.UI.createLabel({
-        text:label,
-        font:{fontSize:16,fontWeight:'bold'},
-        left:10
+        text:rowData.title,
+        font:{fontSize:15,fontWeight:'bold'},
+        left:10,top:10,
+        height:'auto'
     });
     row.add(cellLabel);
+    Ti.API.info('Created (and added) the title to the row');
 
-    // enable the property to be omitted
-    // TODO: use a type variable to create different styles of controls?
-    if(property != null){
-        // add a switch to the right
-        var sw = Ti.UI.createSwitch({
-            right:10,
-            value:Ti.App.Properties.getBool(property,initialValue)
-        });
+    // create a label for the subtitle
+    // duration is millis
+    var hour = Math.floor(rowData.duration / 1000 / 60 / 60);
+    var min = Math.floor(rowData.duration / 1000 / 60) % 60;
+    var sec = Math.floor(rowData.duration / 1000) % 60;
+    var durationString = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
+    Ti.API.info('Created the durationString: '+durationString);
 
-        // add a callback function to set application
-        // properties when the value is changed
-        sw.addEventListener('change', function(e)
-        {
-            // update the property with the state of the switch
-            Ti.App.Properties.setBool(property,e.value);
+    // distance
+    var distanceString; 
+     if(Ti.App.Properties.getBool('useMetric',false)) {
+        Ti.API.info('Metric units');
+        var distanceUnits = "KM";
+        var speedUnits = 'KPH';
 
-            Ti.API.info('Property changed: '+property+', '+e.value);
-        });
+        var distanceUnitValue = 0.001; //m -> km
+        var speedUnitValue = 3.6; // m/s -> M/hr
 
-        row.add(sw);
+        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
+    } else {
+        Ti.API.info('Imperial units');
+        var distanceUnits = "Miles";
+        var speedUnits = 'MPH';
 
-	}
+        var distanceUnitValue = 0.000621371192; // m -> mile
+        var speedUnitValue = 2.236936; // m/s -> M/hr
 
-	row.className = 'control';
-	return row;
+        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
+   }
+   Ti.API.info('Created the distanceString: '+distanceString);
+
+    // combine the two to create the subtitle label
+    // smaller and grey
+    var subtitleLabel = Ti.UI.createLabel({
+        text:durationString +' | '+distanceString,
+        font:{fontSize:13},
+        color:'#666',
+        left:10,top:23
+    });
+    row.add(subtitleLabel);
+    Ti.API.info('Created (and added) the subtitle label to the row');
+
+    // add these strings to the row object for easy retrieval in the detail view
+    row.distanceString = distanceString;
+    row.durationString = durationString;
+   
+    // also add data useful for retrieving the log later
+    row.eventID = rowData.eventID;
+    row.logID = rowData.logID;
+
+    // add the child icon
+    //row.hasChild = true;
+    row.hasCheck = rowData.hasCheck;
+
+	row.className = 'logrow';
+	
+    Ti.API.info('Finished setting up the row. Now returning it');
+    return row;
 }
-*/
+
 
 // call up the log list from the database
 function loadLogs () {
@@ -484,7 +531,11 @@ function loadLogs () {
             var rowParams = {   title:new Date(thisTimestamp*1000).toLocaleString(), // only stored as seconds
                                 eventID:rows.fieldByName('eventid'),
                                 content:null,
-                                timestamp:thisTimestamp};
+                                timestamp:thisTimestamp,
+                                duration:rows.fieldByName('duration'),
+                                distance:rows.fieldByName('distance'),
+                                logID:rows.fieldByName('id')
+                                };
 
             /* // notes on creating custom row layouts
             row = Ti.UI.createTableViewRow();
@@ -510,6 +561,11 @@ function loadLogs () {
     }
     rows.close();
     logDB.close();
+
+    // generate the custom rows, and push them to the data:
+    for (var i = 0; i < tmpData.length; i++) {
+        tmpData[i] = addLogRow(tmpData[i]);
+    };
 
     // sort chronolocically:
     //tmpData.sort(compareTime);
