@@ -23,6 +23,40 @@ win.addEventListener('open',function() {
     // maybe in app.js.
     Ti.API.info('In the window open event. About to setup DB.');
     setupDatabase();
+
+    // check to see if the the event was open when the app quit
+    var thisEventID = Ti.App.Properties.getString('eventid','');
+    if(thisEventID != '') {
+        if(Ti.App.Properties.getBool('autoResume',false) === false){
+            var alertDialog = Ti.UI.createAlertDialog({
+                title:'Restore Log',
+                message:'A log may have been interrupted. Would you like to continue logging?',
+                buttonNames:['OK','Cancel']
+            });
+            alertDialog.addEventListener('click',function(e){
+                switch(e.index) {
+                    case 0:
+                        // continue log
+                        startLogging(thisEventID);
+                        loggingSwitch.value = true;
+                        break;
+                    case 1:
+                        // do nothing, just remove the eventID
+                        Ti.App.Properties.setString('eventid','');
+                        break;
+                    default:
+                        // do nothing, just remove the eventID
+                        Ti.App.Properties.setString('eventid','');
+                }
+            });
+
+            alertDialog.show();
+        } else {
+            // continue log
+            startLogging(thisEventID);
+            loggingSwitch.value = true;
+        }
+    }
 });
 
 function setLoggingState(state) {
@@ -151,7 +185,7 @@ var speedlabel = Titanium.UI.createLabel({
 	font:{fontSize:64,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:60
+    top:70
 });
 
 var speedUnitLabel = Ti.UI.createLabel({
@@ -159,18 +193,42 @@ var speedUnitLabel = Ti.UI.createLabel({
    	font:{fontSize:22,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:125,
+    top:135,
     text:speedUnits
 });
 
+var lonLabel = Ti.UI.createLabel({
+    color:'#333',
+   	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+    textAlign:'left',
+    height:'auto',
+    top:10,left:10
+});
+
+var latLabel = Ti.UI.createLabel({
+    color:'#333',
+   	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+    textAlign:'left',
+    height:'auto',
+    top:30,left:10
+});
 
 var headingLabel = Ti.UI.createLabel({
     color:'#333',
-   	font:{fontSize:24,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+   	font:{fontSize:28,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
     top:20,
     text:'000\u00B0' // this is the degree symbol
+});
+
+var cardinalLabel = Ti.UI.createLabel({
+    color:'#333',
+   	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
+    textAlign:'center',
+    height:'auto',
+    top:48,
+    text:'N' // for cardinal direction
 });
 
 // TODO: remove, this is only for debugging:
@@ -192,8 +250,8 @@ var accuracyLabel = Ti.UI.createLabel({
 
 var compassView = Ti.UI.createView({
     width:320,height:200,
-    center:{x:160,y:160},
-    left:0,top:65
+    center:{x:160,y:170},
+    left:0,top:75
 });
 
 var compass = Ti.UI.createImageView({
@@ -432,6 +490,8 @@ function startLogging(restore) {
     currentSample = new Object();
     currentSample.logID = logID;
 
+    // store this eventid in the app properties
+    Ti.App.Properties.setString('eventid',eventID);
     loggingState = true;
     
     // grab the current position and fill in the currentSample
@@ -457,6 +517,8 @@ function startLogging(restore) {
 function stopLogging() {
     Ti.API.info('In the stopLogging method');
     
+    // store this eventid in the app properties
+    Ti.App.Properties.setString('eventid','');
     loggingState = false;
   
     clearInterval(loggingInterval);
@@ -598,14 +660,18 @@ loggingSwitch.addEventListener('change',function(e) {
 
 });
 
-dashboardView.add(accuracyLabel);
+//dashboardView.add(accuracyLabel);
 dashboardView.add(accLabel);
+
+dashboardView.add(lonLabel);
+dashboardView.add(latLabel);
 
 compassView.add(speedlabel);
 compassView.add(speedUnitLabel);
 
 compassView.add(headingLabel);
-compassView.add(headingAccuracyLabel);
+//compassView.add(headingAccuracyLabel);
+compassView.add(cardinalLabel);
 
 dashboardView.add(compassView);
 dashboardView.add(consoleView);
@@ -619,7 +685,7 @@ dashboardView.add(audioLevelImage);
 Ti.UI.currentWindow.add(dashboardView);
 
 function updateSpeedLabel (speed) {
-    if(speed == null) speed = 0;
+    if(speed == null || speed == undefined) speed = 0;
     speedlabel.text = (speedUnitValue * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 }
 
@@ -628,6 +694,10 @@ function updateHeadingLabel(heading) {
     
     // this is needed to append the degree symbol to the heading label
     headingLabel.text = parseInt(heading) + "\u00B0";
+
+    // update the cardinal direction label, too
+    var cardinalDir = ['N','NE','E','SE','S','SW','W','NW','N'];
+    cardinalLabel.text = cardinalDir[Math.abs(Math.floor((heading+22.5)/45))%8];
 }
 
 function updateAccuracyLabel(meters) {
@@ -637,6 +707,19 @@ function updateAccuracyLabel(meters) {
 function updateForceLabel (force) {
     forceLabel.text = parseFloat(force).toFixed(1) + 'g';
 }
+
+function updateLocationLabel (loc) {
+    if(loc.lon == null || loc.lat == null) return;
+
+    // determine if lon is W ( <0) or E ( >0)
+    // determine if lat is N ( >0) or S ( <0)
+    var lonUnit = (loc.lon < 0) ? 'W' : 'E';
+    var latUnit = (loc.lat > 0) ? 'N' : 'S';
+    
+    lonLabel.text = Math.abs(loc.lon.toFixed(5)) +'\u00B0 '+ lonUnit;
+    latLabel.text = Math.abs(loc.lat.toFixed(5)) +'\u00B0 '+ latUnit;
+}
+
 
 // simple padding function
 function pad2(number) {
@@ -799,7 +882,7 @@ function checkAudioLevels() {
 
 function setAudioMonitoring (state) {
     if(state == null) {
-        state = Ti.App.Properties.getBool('monitorSound',false);
+        state = Ti.App.Properties.getBool('monitorSound',true); // enable audio monitoring by default
     } else {
         Ti.App.Properties.setBool('monitorSound',state);
     }
@@ -918,7 +1001,8 @@ else
             //    setTimeout(timeoutVibration,3000);
             //}
 
-            
+            currentSample.heading = Math.round(trueHeading);
+
             headingAccuracyLabel.text = accuracy;
             updateHeadingLabel(trueHeading);
             rotateCompass(trueHeading);
@@ -948,7 +1032,14 @@ else
 	Titanium.Geolocation.getCurrentPosition(function(e)
 	{
         updateLocationData(e);	
-		
+			
+        Titanium.Geolocation.reverseGeocoder(e.coords.latitude,e.coords.longitude,function(evt)
+		{
+			var places = evt.places;
+			//reverseGeo.text = places[0].address;
+			Titanium.API.debug("reverse geolocation result = "+JSON.stringify(evt));
+		});
+			
 		//Titanium.API.info('geo - current location: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
 	});
 
@@ -957,15 +1048,17 @@ else
 	{
         updateLocationData(e);
 
-//		// reverse geo
-//		Titanium.Geolocation.reverseGeocoder(latitude,longitude,function(evt)
-//		{
-//			var places = evt.places;
-//			reverseGeo.text = places[0].address;
-//			Titanium.API.debug("reverse geolocation result = "+JSON.stringify(evt));
-//		});
-//		
-//		
+        // TODO: fire this on a pretty slow timer?
+        // and only after a previously successful return value
+		// reverse geo
+		Titanium.Geolocation.reverseGeocoder(e.coords.latitude,e.coords.longitude,function(evt)
+		{
+			var places = evt.places;
+			//reverseGeo.text = places[0].address;
+			Titanium.API.debug("reverse geolocation result = "+JSON.stringify(evt));
+		});
+		
+		
 		//Titanium.API.info('geo - location updated: ' + new Date(timestamp) + ' long ' + longitude + ' lat ' + latitude + ' accuracy ' + accuracy);
 	});
 
@@ -993,6 +1086,8 @@ function updateLocationData(e) {
     updateAccuracyLabel(accuracy);
     updateSpeedLabel(speed);
     updateAccuracyView(accuracy);
+
+    updateLocationLabel({lon:longitude,lat:latitude});
 
     // calculate distance travelled.
     // TODO: filter out small changes to minimize cumulative errors?
@@ -1026,7 +1121,10 @@ function updateLocationData(e) {
     currentSample.altAcc = altitudeAccuracy.toFixed(2);
     currentSample.speed = speed.toFixed(2);
     currentSample.timestamp = timestamp;
-    currentSample.heading = heading; // TODO: use the heading from the heading callback.
+
+    if(!Titanium.Geolocation.hasCompass){
+        currentSample.heading = Math.round(heading); // only use this if the device lacks a compass.
+    }
 };
 
 // methods for the accelerometer

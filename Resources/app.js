@@ -1,7 +1,10 @@
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)
 Titanium.UI.setBackgroundColor('#000');
 
-var greenColor = 'rgb(85,130,80)';
+//var greenColor = 'rgb(85,130,80)';
+//var orangeColor = '#f27f14';
+var orangeColor = '#d56009';
+var blueColor = '#c8e6ff';
 
 // create tab group
 var tabGroup = Titanium.UI.createTabGroup();
@@ -18,9 +21,8 @@ var win1 = Titanium.UI.createWindow({
 // barColor:greenColor
 });
 var tab1 = Titanium.UI.createTab({  
-    icon:'KS_nav_views.png',
+    icon:'map-tab-icons.png',
     title:'Dashboard',
-    backgroundColor:greenColor,
     window:win1
 });
 
@@ -31,12 +33,11 @@ var win2 = Titanium.UI.createWindow({
     url:'main_windows/logList.js',
     title:'Logs',
     backgroundColor:'#ccc',
-    barColor:greenColor
+    barColor:orangeColor
 });
 var tab2 = Titanium.UI.createTab({  
-    icon:'KS_nav_ui.png',
+    icon:'list-tab-icons.png',
     title:'Logs',
-    backgroundColor:greenColor,
     window:win2
 });
 
@@ -47,12 +48,11 @@ var winSettings = Titanium.UI.createWindow({
     url:'main_windows/settings.js',
     title:'Settings',
     backgroundColor:'#ccc',
-    barColor:greenColor
+    barColor:orangeColor
 });
 var tabSettings = Titanium.UI.createTab({  
     icon:'settings_tab.png',
     title:'Settings',
-    backgroundColor:greenColor,
     window:winSettings
 });
 

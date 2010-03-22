@@ -1,5 +1,8 @@
 // the log file list viewer
 
+//var orangeColor = '#f27f14';
+var orangeColor = '#d56009';
+var blueColor = '#c8e6ff';
 
 Ti.include('../tools/json2.js');
 Ti.include('export.js');
@@ -14,7 +17,7 @@ if(Ti.Platform.name == 'iPhone OS') {
     //actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
     actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.DARK;
 }
-actInd.zIndex = 100; // trying to bring this to the front
+actInd.zIndex = 100; // trying to bring this to the front. not working.
 win.add(actInd);
 
 
@@ -30,40 +33,62 @@ if(Ti.Platform.name == 'iPhone OS'){
     b.title = 'Send';
 }
 
+var isExporting = false;
 
-function sendLog(format){
+function sendLog(params){
+    var format = params.format;
+    var eventID = params.eventID;
+
     // format: [json, csv, gc]
-    if(format == null) format = 'csv';
+    if(format == null) format = Ti.App.Properties.getString('exportFormat','csv');
+    if(eventID == null) eventID = false;
 
+    if(isExporting) return; // don't try sending again if we're already sending
     // TODO: invoke an action sheet with options for sending the data
     // at the moment, just back to emailing off an attachment
 
-    // display an alert if there are no rows selected
-    // (or, if more than one is selected while i sort out that bug)
-    if(selectedEvents.length < 1) {
-        Ti.UI.createAlertDialog({
-            title:'Select Log',
-            message:"Please select a log file to send."
-        }).show();
-        return;
-    } else if (selectedEvents.length > 1) {
-        Ti.UI.createAlertDialog({
-            title:'Select one log',
-            message:"Select one log to send at a time. \n *TODO: this is a bug*"
-        }).show();
-        return;
+    var eventListArray = [];
+
+    // fall back on using the selectedEvents list if an eventID isn't explicitly defined
+    if(!eventID) {
+        // display an alert if there are no rows selected
+        // (or, if more than one is selected while i sort out that bug)
+        if(selectedEvents.length < 1) {
+            Ti.UI.createAlertDialog({
+                title:'Select Log',
+                message:"Please select a log file to send."
+            }).show();
+            return;
+        } else if (selectedEvents.length > 1) {
+            Ti.UI.createAlertDialog({
+                title:'Select one log',
+                message:"Select one log to send at a time. \n *TODO: this is a bug*"
+            }).show();
+            return;
+        }
+        
+        for (var i = 0; i < selectedEvents.length; i++) {
+            var evt = selectedEvents[i];
+            eventListArray.push(evt);//"'"+evt+"'"); // trying to get this query to work.
+            Ti.API.info('eventID: '+selectedEvents[i]);
+        };
+    } else {
+        // just use the one provided eventID
+        eventListArray.push(eventID);
     }
+
+    // display an activity indicator
+    var activity = Ti.UI.createActivityIndicator();
+    activity.show();
+
+    // disable the send button while the export is preparing
+    b.enabled = false;
+    b.touchEnabled = false;
+    isExporting = true;
 
     // retrieve the rows and setup an email message
     var sampleData;
     var logDB = Ti.Database.open("log.db");
-
-    var eventListArray = [];
-    for (var i = 0; i < selectedEvents.length; i++) {
-        var evt = selectedEvents[i];
-        eventListArray.push(evt);//"'"+evt+"'"); // trying to get this query to work.
-        Ti.API.info('eventID: '+selectedEvents[i]);
-    };
 
     Ti.API.info('Selected Events list: '+eventListArray.join());
     var eventList = eventListArray.join();
@@ -114,6 +139,8 @@ function sendLog(format){
 
     // ok, now construct the email window
     var emailView = Ti.UI.createEmailDialog();
+    emailView.barColor = orangeColor;
+
     emailView.setSubject(' Log data');
   
     // export the data in a selected format:
@@ -196,6 +223,13 @@ function sendLog(format){
     });
     emailView.open();
 
+    // hide the activity indicator
+    activity.hide();
+
+    // enable the send button
+    b.enabled = true;
+    b.touchEnabled = true;
+    isExporting = false;
 };
 
 
@@ -227,7 +261,7 @@ logTable.addEventListener('click',function(e)
     // TODO: organize the data into events
     // inspect each event in the child view
    
-
+/*
     // because the android doesn't have a navbar with buttons,
     // use the options dialog (action sheet) to reveal
     // log inspection and upload functions
@@ -293,31 +327,112 @@ logTable.addEventListener('click',function(e)
     });
 
 
-    Ti.API.info('Showing the options dialog');
-    optionsDialog.show();
+    // Ti.API.info('Showing the options dialog');
+    // optionsDialog.show();
+*/
+
+    // no longer displaying the action sheet...
+    // just reveal the detail page
+    displayDetail();
 
    function displayDetail() { 
         var newwin = Titanium.UI.createWindow({
-			title:'Data Sample',
-            backgroundColor:'#ddd'
+			title:'Log Summary',
+            backgroundColor:'#ccc',
+            barColor:orangeColor
 		});
 
-        // TODO: layout a nice summary page
-        // Include a map to plot the ride?
-        var sample = Ti.UI.createTextArea({
-            value:e.rowData.logID +' / '+e.rowData.eventID, //content,
-            height:300,
-            width:300,
-            top:10,
-            font:{fontSize:16,fontFamily:'Marker Felt', fontWeight:'bold'},
-            color:'#666',
-            textAlign:'left',
-            borderWidth:2,
-            borderColor:'#bbb',
-            borderRadius:5,
-            editable:false
+        // set a custom property to be able to identify this as a detail window
+        newwin.isDetailWindow = true;
+
+                
+        // add a send action button
+        var sendButton = Titanium.UI.createButton();
+        // use special button icon if on iPhone
+        if(Ti.Platform.name == 'iPhone OS'){
+            sendButton.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
+            newwin.rightNavButton = sendButton;
+        } else {
+            sendButton.title = 'Send';
+            // TODO: figure out a solution for android
+            // Menu?
+        }
+        //TODO: should this display the options dialog?
+        sendButton.addEventListener('click',function(){sendLog({eventID:e.rowData.eventID});});
+
+
+        // This is where we have to query the database and calculate and metrics needed
+        // TODO: *very* close to having to extract the log data into columns
+        var logDB = Ti.Database.open('log.db');
+
+        // get the first item
+        var rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID ASC LIMIT 1',e.rowData.logID);    
+        var firstSample = JSON.parse(rows.fieldByName('DATA'));
+        rows.close();
+        // get the last item
+        rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID DESC LIMIT 1',e.rowData.logID);    
+        var lastSample = JSON.parse(rows.fieldByName('DATA'));
+        rows.close();
+        logDB.close();
+        Ti.API.info('Got the first and last items from the current log');
+
+        Ti.API.info('First sample: '+ JSON.stringify(firstSample));
+        Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
+
+        // construct the table view with the groupings here.
+        var summaryTable = Ti.UI.createTableView({
+            backgroundColor:'#ccc',
+            headerTitle:e.rowData.name,
+            style:Titanium.UI.iPhone.TableViewStyle.GROUPED
         });
-        newwin.add(sample);
+
+        // create the data for the table
+        var summaryData = [];
+        var mapRow = addMapRow([firstSample,lastSample]); // TODO: figure a better data delivery method
+
+        //mapRow.header = e.rowData.title;
+        summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
+       
+        //var metricsSection = Titanium.UI.createTableViewSection();
+        //metricsSection.headerTitle = "Metrics";
+
+        var firstRow = addSummaryRow('Duration',e.rowData.durationString);
+        firstRow.header = "Metrics";
+        summaryData.push(firstRow);
+      
+        // TODO: how to change this if the distance units are changed?
+        summaryData.push(addSummaryRow('Distance',e.rowData.distanceString));
+        summaryData.push(addSummaryRow('Average speed','xx'));
+        summaryData.push(addSummaryRow('Altitude gain','xx'));
+        summaryData.push(addSummaryRow('Average loudness','xx'));
+        summaryData.push(addSummaryRow('Bumpiness factor','xx'));
+
+        // add the delete log button
+        // TODO: make this a big red button, and link to the delete logic
+        // including the alert view prompts
+        var deleteButton = Titanium.UI.createButton({
+            title:'Delete Log',
+            font:{fontSize:20,fontWeight:'bold'},
+            height:45,
+            width:300,
+            backgroundImage:'../images/button_red-150x45.png',
+            borderRadius:10
+        });
+        deleteButton.addEventListener('click',function() {
+            Ti.API.info('Delete button (detail view) clicked for eventID: '+e.rowData.eventID);
+            deleteEvent(e.rowData.eventID,newwin); // second arg to close the current window
+            //Ti.API.info('Event should have been deleted');
+        });
+
+        var deleteRow = Ti.UI.createTableViewRow();
+        deleteRow.header = ''; // nieve way to add a new section to the table
+        deleteRow.add(deleteButton);
+        summaryData.push(deleteRow);
+
+        summaryTable.setData(summaryData);
+        Ti.API.info('Created summaryTable and added summary data rows');
+        
+        newwin.add(summaryTable);
 
 		Titanium.UI.currentTab.open(newwin,{animated:true});
    }
@@ -368,8 +483,22 @@ logTable.addEventListener('delete',function(e)
     deleteEvent(eventID);
 });
 
-function deleteEvent(eventID) {
+function deleteEvent(eventID,closeWindow) {
     if(eventID == null) { return; }
+    if(closeWindow == null) closeWindow = false;
+
+    // Don't delete a currently recoring log
+    if(eventID == Ti.App.Properties.getString('eventid','')) {
+        // display and alert and return
+        var alertDialog = Ti.UI.createAlertDialog({
+            title:'Currently Logging',
+            message:'Unable to delete this log while recording.',
+            buttonNames:['OK']
+        });
+        alertDialog.show();
+        return;
+    }
+
 
     // remove the log data from the db
     // but first confirm with an alert
@@ -398,6 +527,13 @@ function deleteEvent(eventID) {
             logDB.close();
            
             Ti.API.info('deleted eventID: '+eventID);
+
+            // if we're in the detail page..then have to close the current window
+            Ti.API.info('This is the detail window: '+JSON.stringify(closeWindow));
+            if(closeWindow != false) {
+                Ti.API.info('About the close the detail window since the log was deleted');
+                closeWindow.close();
+            }
         }
         // have to refresh the table data
         Ti.API.info('Reloading log list from alert dialog');
@@ -484,10 +620,11 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     // also add data useful for retrieving the log later
     row.eventID = rowData.eventID;
     row.logID = rowData.logID;
+    row.name = rowData.title;
 
     // add the child icon
-    //row.hasChild = true;
-    row.hasCheck = rowData.hasCheck;
+    row.hasChild = true;
+    //row.hasCheck = rowData.hasCheck;
 
 	row.className = 'logrow';
 	
@@ -616,3 +753,170 @@ function compareTime(a, b) {
 
 // add the log table to the view.
 win.add(logTable);
+
+
+// Methods for the log detail view
+// set up in a grouped table view.
+// Table header is the file name (startdate)
+//
+// a static map view with annotations for the start and end of the ride
+// when clicked will push a live, native map view
+// Alternatively: set touchEnabled to false when in the table view
+// then switch to true when fullscreen?
+// use the same map view in the table cell, and added to a new window when pushed fullscreen
+//
+// section with summary data (label / value)
+// delete button at the bottom of the table
+// similar to the delete contact or wifi network from apple apps
+//
+// Map:
+// create a map view, but only show the static (toImage()) image in the table
+// when clicked, push it to the current window using an animated transition
+// TODO: add a subset of the samples as annotations to depict the route?
+// use the 'complete' event handler to trigger the generation of the static image
+// put a spinner activity indicator in the cell while loading.
+
+function addMapRow (logData) {
+    Ti.API.info('In addMapRow()');
+    
+    var mapHeight = 200;
+
+    var row = Ti.UI.createTableViewRow({height:mapHeight});
+    if(Ti.Platform.name == 'iPhone OS'){
+        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
+    }
+    Ti.API.info('Created row container');
+
+    // Create the annotations
+    var firstPoint = Titanium.Map.createAnnotation({
+        latitude:logData[0].lat,
+        longitude:logData[0].lon,
+        title:"Log start",
+        //subtitle:'Mountain View, CA',
+        pincolor:Titanium.Map.ANNOTATION_GREEN,
+        animate:true,
+        //leftButton: '../images/appcelerator_small.png',
+        myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+    });
+    Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
+    
+    var lastPoint = Titanium.Map.createAnnotation({
+        latitude:logData[1].lat,
+        longitude:logData[1].lon,
+        title:"Log end",
+        //subtitle:'Mountain View, CA',
+        pincolor:Titanium.Map.ANNOTATION_RED,
+        animate:true,
+        //leftButton: '../images/appcelerator_small.png',
+        myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+    });
+    Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
+    Ti.API.info('Created anntations');
+
+    var map = Ti.Map.createView({
+        width:300,height:mapHeight,
+        borderRadius:10,
+        borderWidth:1,
+        borderColor:'#999',
+        annotations: [firstPoint,lastPoint]
+    });
+    Ti.API.info('Created map view');
+
+    map.userLocation = false;
+    //map.annotations = [firstPoint,lastPoint];
+    Ti.API.info('Added annotations to the map');
+
+    // region
+    // to get the region, look for the extents?
+    // or, more simply use the first and last points
+    // calculate the midpoint for the region center
+    // and half the distance between them (in degrees) (+ 10%?) as the deltas
+    var p1 = {lat:firstPoint.latitude, lon:firstPoint.longitude};
+    var p2 = {lat:lastPoint.latitude, lon:lastPoint.longitude};
+
+    // sanity checking:
+    var setRegion = true;
+    if(p1.lon == null || p1.lat == null) {
+        p1 = p2;
+    } 
+    if(p2.lon == null || p2.lat == null) {
+        p2 = p1;
+        
+        // if p2 is still null then neither point was valid
+        if(p2.lon == null || p2.lat == null) setRegion = false;
+    }
+    
+//    p1.lat = (p1.lat == null) ? 0 : p1.lat;
+//    p2.lat = (p2.lat == null) ? 0 : p2.lat;
+//    p1.lon = (p1.lon == null) ? 0 : p1.lon;
+//    p2.lon = (p2.lon == null) ? 0 : p2.lon;
+
+    function makeRegion (p1,p2) {
+        var midpoint = { lon:parseFloat(p1.lon) + (p2.lon - p1.lon)/2,
+                         lat:parseFloat(p1.lat) + (p2.lat - p1.lat)/2 };
+        var delta = { lon: Math.max(0.01,Math.abs(p2.lon - p1.lon)),
+                      lat: Math.max(0.01,Math.abs(p2.lat - p1.lat)) };
+        Ti.API.info('Got the region: '+ JSON.stringify(midpoint) +', '+JSON.stringify(delta));
+
+        var region = {  latitude: midpoint.lat,
+                        longitude: midpoint.lon,
+                        latitudeDelta: delta.lat,
+                        longitudeDelta: delta.lon };
+        return region;
+    }
+    if(setRegion) {
+        map.region = makeRegion(p1,p2);
+        map.regionFit = true;
+    }
+
+    Ti.API.info('Set the map region');
+
+    row.add(map);
+
+    // TODO: add event listener for click to display the fullscreen map
+    // TODO: use logData to center the map on the bounds of the start / end locations of the ride
+    
+    row.className = 'maprow';
+
+    Ti.API.info('Returning map row');
+    return row;
+}
+
+function addSummaryRow (label,value) {
+    // have some logic for dealing with empty values?
+    if(label == null) label = 'Summary';
+    if(value == null) value = '';
+
+    var row = Ti.UI.createTableViewRow({height:50});
+    row.backgroundColor = '#fff';
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:18,fontWeight:'bold'},
+        left:10,
+        height:'auto'
+    });
+    row.add(cellLabel);
+    //Ti.API.info('Created (and added) the title to the row');
+
+    // add the summary value
+    var cellValue = Ti.UI.createLabel({
+        text:value,
+        font:{fontSize:16},
+        textAlign:'right',
+        right:10,
+        height:'auto'
+    });
+    row.add(cellValue);
+    //Ti.API.info('Created (and added) the value label to the row');
+
+    row.className = 'summaryrow';
+
+    Ti.API.info('Returning a summary row for: '+label);
+    return row;
+}
+
+
+

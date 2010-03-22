@@ -3,10 +3,10 @@
 <id>com.robertcarlsen.Dashboard</id>
 <name>Dashboard</name>
 <version>1.0</version>
-<publisher>rcarlsen</publisher>
+<publisher>Robert Carlsen</publisher>
 <url>robertcarlsen.net</url>
-<description>No description provided</description>
-<copyright>2010 by rcarlsen</copyright>
+<description>Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance.</description>
+<copyright>2010 by Robert Carlsen</copyright>
 <icon>appicon.png</icon>
     <persistent-wifi>false</persistent-wifi>
     <prerendered-icon>false</prerendered-icon>
