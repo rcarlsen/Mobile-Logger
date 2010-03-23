@@ -360,7 +360,6 @@ logTable.addEventListener('click',function(e)
         //TODO: should this display the options dialog?
         sendButton.addEventListener('click',function(){sendLog({eventID:e.rowData.eventID});});
 
-
         // This is where we have to query the database and calculate and metrics needed
         // TODO: *very* close to having to extract the log data into columns
         var logDB = Ti.Database.open('log.db');
@@ -496,6 +495,9 @@ function deleteEvent(eventID,closeWindow) {
             buttonNames:['OK']
         });
         alertDialog.show();
+        
+        // refresh the list if we're in the log list view
+        if(!Ti.UI.currentWindow.isDetailWindow) loadLogs();
         return;
     }
 

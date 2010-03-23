@@ -76,8 +76,9 @@ function setLoggingState(state) {
 
 /*// toggle the display*/
 //win.addEventListener('twofingertap',function(e){
-    //toggleDisplayVisibility();
-/*});*/
+win.addEventListener('dblclick',function(e){
+    toggleDisplayVisibility();
+});
 
 // set up some instance vars:
 var loggingState = false; // toggle this when recording
@@ -686,6 +687,8 @@ Ti.UI.currentWindow.add(dashboardView);
 
 function updateSpeedLabel (speed) {
     if(speed == null || speed == undefined) speed = 0;
+    if(speedUnitValue == null) speedUnitValue = 0;
+
     speedlabel.text = (speedUnitValue * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 }
 
@@ -775,6 +778,19 @@ function animateLocationView () {
 	});   
 }
 
+
+var reminderLabel = Ti.UI.createLabel({
+    height:'auto',
+    text:'Dashboard hidden.\nDouble-tap to display',
+    color:'#aaa',
+    textAlign:'center',
+    //top:40,
+    font:{fontSize:18,fontWeight:'bold'}
+});
+reminderLabel.hide();
+win.add(reminderLabel);
+
+
 // toggle the dashboard view transparency
 // trying to save a bit of the battery by disabling the screen
 // TODO: what about the tab bar?
@@ -783,13 +799,27 @@ function toggleDisplayVisibility (state) {
     if(state == null) {
         state = !dashboardView.visible;
     }
+    Ti.API.info('Toggling dashboard visible: '+state);
 
-    if(state === true) {
+    if(state == true) {
+        reminderLabel.hide();
+        win.backgroundColor = '#ccc';
+        //dashboardView.show();
+        var a = Titanium.UI.createAnimation({opacity:1.0,duration:300});
+        dashboardView.animate(a);
         dashboardView.show();
-    } else if (state === false) {
-        dashboardView.hide();
+    } else if (state == false) {
+        // add a label to indicate that the display is hidden
+        reminderLabel.show()
+        win.backgroundColor = '#000';
+        //dashboardView.hide();
+        var a = Titanium.UI.createAnimation({opacity:0,duration:300});
+        a.addEventListener('complete',function(){
+            dashboardView.hide();
+        });
+        dashboardView.animate(a);
     }
-
+    Ti.API.info('Finished toggling the dashboard visibility');
 }
 
 
