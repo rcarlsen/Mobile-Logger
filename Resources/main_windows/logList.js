@@ -7,6 +7,7 @@ var blueColor = '#c8e6ff';
 Ti.include('../tools/json2.js');
 Ti.include('export.js');
 Ti.include('../tools/date.format.js');
+Ti.include('../tools/util.js');
 
 var win = Ti.UI.currentWindow;
 
@@ -401,10 +402,10 @@ logTable.addEventListener('click',function(e)
       
         // TODO: how to change this if the distance units are changed?
         summaryData.push(addSummaryRow('Distance',e.rowData.distanceString));
-        summaryData.push(addSummaryRow('Average speed','xx'));
-        summaryData.push(addSummaryRow('Altitude gain','xx'));
-        summaryData.push(addSummaryRow('Average loudness','xx'));
-        summaryData.push(addSummaryRow('Bumpiness factor','xx'));
+        summaryData.push(addSummaryRow('Average speed',e.rowData.avgSpeedString));
+        //summaryData.push(addSummaryRow('Altitude gain','xx'));
+        //summaryData.push(addSummaryRow('Average loudness','xx'));
+        //summaryData.push(addSummaryRow('Bumpiness factor','xx'));
 
         // add the delete log button
         // TODO: make this a big red button, and link to the delete logic
@@ -581,7 +582,8 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     var durationString = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
     Ti.API.info('Created the durationString: '+durationString);
 
-    // distance
+    // distance / average
+    var avgSpeedString;
     var distanceString; 
      if(Ti.App.Properties.getBool('useMetric',false)) {
         Ti.API.info('Metric units');
@@ -592,6 +594,9 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         var speedUnitValue = 3.6; // m/s -> M/hr
 
         distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
+
+        avgSpeedString = (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
+        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
     } else {
         Ti.API.info('Imperial units');
         var distanceUnits = "Miles";
@@ -601,6 +606,9 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         var speedUnitValue = 2.236936; // m/s -> M/hr
 
         distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
+
+        avgSpeedString = (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
+        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
    }
    Ti.API.info('Created the distanceString: '+distanceString);
 
@@ -618,7 +626,8 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     // add these strings to the row object for easy retrieval in the detail view
     row.distanceString = distanceString;
     row.durationString = durationString;
-   
+    row.avgSpeedString = avgSpeedString;
+
     // also add data useful for retrieving the log later
     row.eventID = rowData.eventID;
     row.logID = rowData.logID;
@@ -738,6 +747,17 @@ function loadLogs () {
 win.addEventListener('focus',function() {
     loadLogs();
     //selectedEvents = [];
+});
+
+// ensure that the db has been created
+// will this be a problem if logging is happening?
+win.addEventListener('open',function() { 
+    // if logging is already occurring, we can assume that the db has been created
+    // trying to avoid a db conflict
+    // otherwise, set up the db once.
+    if(Ti.App.Properties.getString('eventid','') == ''){
+        setupDatabase(); 
+    }
 });
 
 // the android doesn't seem to be responding to focus or open events

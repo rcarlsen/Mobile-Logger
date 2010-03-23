@@ -1,8 +1,8 @@
-#appname: Dashboard
+#appname: MobileLogger
 #publisher: rcarlsen
-#url: robertcarlsen.net
+#url: http://robertcarlsen/net
 #image: appicon.png
-#appid: com.robertcarlsen.Dashboard
+#appid: net.robertcarlsen.MobileLogger
 #desc: undefined
 #type: mobile
-#guid: ec3286a4-55c7-4659-bb3a-3a4b07e359f2
+#guid: 85e942c2-cae5-48e1-8f05-d32621ee71bf
