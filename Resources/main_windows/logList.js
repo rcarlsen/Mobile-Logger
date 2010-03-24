@@ -373,11 +373,29 @@ logTable.addEventListener('click',function(e)
         rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID DESC LIMIT 1',e.rowData.logID);    
         var lastSample = JSON.parse(rows.fieldByName('DATA'));
         rows.close();
+
+        // get every nth item
+        rows = logDB.execute('SELECT * FROM LOGDATA WHERE (id = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',e.rowData.logID);
+        var tmpdataset = [];
+        while(rows.isValidRow()){
+            tmpdataset.push(rows.fieldByName('DATA'));
+            rows.next();
+        }
+        Ti.API.info('Got remaining data points, count: '+tmpdataset.length);
+
+        rows.close();
         logDB.close();
         Ti.API.info('Got the first and last items from the current log');
 
         Ti.API.info('First sample: '+ JSON.stringify(firstSample));
         Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
+
+        // now parse that data
+        var dataset = []; 
+        for(var d in tmpdataset){
+            dataset.push(JSON.parse(tmpdataset[d]));
+        }
+        Ti.API.info('Parsed dataset has count: '+dataset.length);
 
         // construct the table view with the groupings here.
         var summaryTable = Ti.UI.createTableView({
@@ -388,7 +406,7 @@ logTable.addEventListener('click',function(e)
 
         // create the data for the table
         var summaryData = [];
-        var mapRow = addMapRow([firstSample,lastSample]); // TODO: figure a better data delivery method
+        var mapRow = addMapRow({first:firstSample,last:lastSample,data:dataset}); // TODO: figure a better data delivery method
 
         //mapRow.header = e.rowData.title;
         summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
@@ -809,10 +827,11 @@ function addMapRow (logData) {
     }
     Ti.API.info('Created row container');
 
+
     // Create the annotations
     var firstPoint = Titanium.Map.createAnnotation({
-        latitude:logData[0].lat,
-        longitude:logData[0].lon,
+        latitude:logData.first.lat,
+        longitude:logData.first.lon,
         title:"Log start",
         //subtitle:'Mountain View, CA',
         pincolor:Titanium.Map.ANNOTATION_GREEN,
@@ -823,8 +842,8 @@ function addMapRow (logData) {
     Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
     var lastPoint = Titanium.Map.createAnnotation({
-        latitude:logData[1].lat,
-        longitude:logData[1].lon,
+        latitude:logData.last.lat,
+        longitude:logData.last.lon,
         title:"Log end",
         //subtitle:'Mountain View, CA',
         pincolor:Titanium.Map.ANNOTATION_RED,
@@ -833,6 +852,30 @@ function addMapRow (logData) {
         myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
     });
     Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
+
+    // now, create all the other annotations.
+    var dataPoints = [];
+    for (var i = 0; i < logData.data.length; i++) {
+        var d = logData.data[i];
+        
+        // make a speed note
+        var speedString;
+        if(Ti.App.Properties.getBool('useMetric',false)) {
+            speedString = toKPH(d.speed).toFixed(2) +' KPH';
+        }else{
+            speedString = toMPH(d.speed).toFixed(2) + ' MPH';
+        }
+        var point = Ti.Map.createAnnotation({
+            latitude:d.lat,
+            longitude:d.lon,
+            title:"Data Point",
+            subtitle:speedString + ((d.dbspl != null) ? ' | '+d.dbspl+' dB' : ''),
+            pincolor:Titanium.Map.ANNOTATION_PURPLE,
+            animate:false,
+            myid:2+i // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+        });
+        dataPoints.push(point);
+    };
     Ti.API.info('Created anntations');
 
     var map = Ti.Map.createView({
@@ -840,6 +883,7 @@ function addMapRow (logData) {
         borderRadius:10,
         borderWidth:1,
         borderColor:'#999',
+        touchEnabled:false,
         annotations: [firstPoint,lastPoint]
     });
     Ti.API.info('Created map view');
@@ -895,9 +939,42 @@ function addMapRow (logData) {
 
     row.add(map);
 
+    // add a detail disclosure button
+    var detailButton = Ti.UI.createButton({
+        backgroundImage:'../detail.png',
+        right:10,bottom:10,
+        width:29,height:29
+    });
+
     // TODO: add event listener for click to display the fullscreen map
     // TODO: use logData to center the map on the bounds of the start / end locations of the ride
+    detailButton.addEventListener('click',function(e){
+        Ti.API.info('In the map row click event');
+        var mapwin = Ti.UI.createWindow({
+            barColor:orangeColor,
+            title:'Samples'
+            });
+        var bigMap = Ti.Map.createView();
+        bigMap.touchEnabled = true;
+        bigMap.height = mapwin.getHeight();
+        bigMap.width = mapwin.getWidth();
+        bigMap.regionFit = true;
+        bigMap.region = map.region;
+        dataPoints.push(firstPoint);
+        dataPoints.push(lastPoint);
+
+        // add all the other annotations
+        bigMap.annotations = dataPoints;
+
+        mapwin.add(bigMap);
+        Ti.API.info('added the map view to the new map window');
+
+        Titanium.UI.currentTab.open(mapwin,{animated:true});
+        Ti.API.info('Should have opened the map window');
+    });
     
+    row.add(detailButton); 
+
     row.className = 'maprow';
 
     Ti.API.info('Returning map row');

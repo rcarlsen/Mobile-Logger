@@ -42,4 +42,23 @@ function setupDatabase() {
     Ti.API.info('Closed log.db');
 }
 
+function toMPH (metersPerSec) {
+    if(metersPerSec == null) return 0;
+    return metersPerSec * 2.236936; // m/s -> M/hr
+}
 
+function toKPH (metersPerSec) {
+    if(metersPerSec == null) return 0;
+    return metersPerSec * 3.6;
+}
+
+function toMiles (meters) {
+    if(meters == null) return 0;
+    return meters * 0.000621371192;
+}
+
+function toKM (meters) {
+    if(meters == null) return 0;
+    return meters * 0.001;
+}
+     

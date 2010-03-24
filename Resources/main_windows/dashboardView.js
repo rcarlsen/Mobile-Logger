@@ -286,7 +286,8 @@ var locationView = Ti.UI.createView({
 
 compassView.add(compass);
 compassView.add(accuracyView);
-compassView.add(locationView);
+// doesn't really help right now.
+//compassView.add(locationView);
 
 
 var consoleView = Ti.UI.createView({
@@ -533,7 +534,7 @@ function recordSample() {
     Ti.API.info('Closed log.db');
 
     // pulse red while recording
-    animateLocationView();
+    //animateLocationView();
 
     Titanium.API.info("Current sample recorded to db");
     Titanium.API.info('Time: '+currentSample.timestamp);
@@ -660,6 +661,7 @@ dashboardView.add(loggingLabel);
 dashboardView.add(audioLevelImage);
 
 // add the changed objects to the current window
+dashboardView.visible = true;
 Ti.UI.currentWindow.add(dashboardView);
 
 function updateSpeedLabel (speed) {
@@ -673,7 +675,7 @@ function updateHeadingLabel(heading) {
     if(heading == null) return;
     
     // this is needed to append the degree symbol to the heading label
-    headingLabel.text = parseInt(heading) + "\u00B0";
+    headingLabel.text = Math.max(0,parseInt(heading)) + "\u00B0";
 
     // update the cardinal direction label, too
     var cardinalDir = ['N','NE','E','SE','S','SW','W','NW','N'];
@@ -774,6 +776,7 @@ win.add(reminderLabel);
 function toggleDisplayVisibility (state) {
     // toggle if no input.
     if(state == null) {
+        Ti.API.info('Dashboard view visible: '+dashboardView.visible);
         state = !dashboardView.visible;
     }
     Ti.API.info('Toggling dashboard visible: '+state);
@@ -1131,6 +1134,8 @@ function updateLocationData(e) {
 
     if(!Titanium.Geolocation.hasCompass){
         currentSample.heading = Math.round(heading); // only use this if the device lacks a compass.
+        updateHeadingLabel(heading);
+        rotateCompass(heading);
     }
 };
 
