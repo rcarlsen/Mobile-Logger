@@ -11,9 +11,9 @@ var orangeColor = '#d56009';
 
 var inputData = [];
 
-//var networkRow = addControlRow('Enabled');
-//networkRow.header = 'Network';
-//inputData.push(networkRow);
+var networkRow = addControlRow('Auto-upload','uploadEnabled',true);
+networkRow.header = 'Network';
+inputData.push(networkRow);
 //inputData.push(addControlRow('Server'));
 //inputData.push(addControlRow('Database'));
 

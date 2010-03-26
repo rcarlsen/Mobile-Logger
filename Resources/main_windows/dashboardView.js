@@ -1,6 +1,8 @@
 // include files
 Ti.include('../tools/json2.js');
 Ti.include('../tools/util.js');
+Ti.include('api.js');
+
 
 // reference the parent window
 var win = Ti.UI.currentWindow;
@@ -23,7 +25,7 @@ win.addEventListener('open',function() {
     // maybe in app.js.
     Ti.API.info('In the window open event. About to setup DB.');
     setupDatabase();
-
+    
     // check to see if the the event was open when the app quit
     var thisEventID = Ti.App.Properties.getString('eventid','');
     if(thisEventID != '') {
@@ -94,6 +96,11 @@ var eventStartDate;
 var eventDuration = 0;
 var clockInterval = 0;
 var audioListenerInterval = 0;
+
+// TODO: work with the database when generating the upload buffer
+// to record which records have been uploaded
+var uploadBuffer = [];
+var uploadTrigger = 10;
 
 // set up configuration for metric or imperial
 // data should *always* be stored in metric / meters
@@ -396,6 +403,9 @@ function resetValues (restore) {
     deviceID =  Titanium.Utils.md5HexDigest(Ti.Platform.id);
     Ti.API.info('Set device ID: '+deviceID);
 
+    // clear the upload buffer
+    uploadBuffer = [];
+
     if(restore == false) {
         Ti.API.info('Creating a new event log.');
         // create a new event
@@ -495,7 +505,12 @@ function startLogging(restore) {
 
 function stopLogging() {
     Ti.API.info('In the stopLogging method');
-    
+   
+    // push the final samples to the server
+    if(Ti.App.Properties.getBool('uploadEnabled',true)){
+        sendBuffer();
+    }
+
     // store this eventid in the app properties
     Ti.App.Properties.setString('eventid','');
     loggingState = false;
@@ -538,7 +553,41 @@ function recordSample() {
 
     Titanium.API.info("Current sample recorded to db");
     Titanium.API.info('Time: '+currentSample.timestamp);
+
+    // upload the sample
+    // DEBUG: testing only
+    // TODO: abstract / buffer this process.
+    if(Ti.App.Properties.getBool('uploadEnabled',true)){
+        var out = currentSample;
+        // make sure that each field is a number
+        for(var f in currentSample){
+            out[f] = parseFloat(currentSample[f]);
+        }
+
+        // add the extra fields
+        out.eventID = eventID;
+        if(!Ti.App.Properties.getBool('omitDeviceID',false)){
+            out.deviceID = deviceID;
+        } else {
+            out.deviceID = -1;
+        }
+
+        // add this sample to the upload buffer:
+        uploadBuffer.push(out);
+        if(uploadBuffer.length >= uploadTrigger){
+            sendBuffer();
+        }
+    }
 };
+
+function sendBuffer() {
+    // send this batch of samples
+    bulkUpload(uploadBuffer);
+
+    // clear the buffer
+    uploadBuffer = [];
+}
+
 // end logging methods//
 
 

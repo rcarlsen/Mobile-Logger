@@ -37,6 +37,7 @@ if(Ti.Platform.name == 'iPhone OS'){
 var isExporting = false;
 
 function sendLog(params){
+    Ti.API.info('In the sendLog() method');
     var format = params.format;
     var eventID = params.eventID;
 
@@ -83,8 +84,8 @@ function sendLog(params){
     activity.show();
 
     // disable the send button while the export is preparing
-    b.enabled = false;
-    b.touchEnabled = false;
+    //sendButton.enabled = false;
+    //sendButton.touchEnabled = false;
     isExporting = true;
 
     // retrieve the rows and setup an email message
@@ -228,9 +229,11 @@ function sendLog(params){
     activity.hide();
 
     // enable the send button
-    b.enabled = true;
-    b.touchEnabled = true;
+    //sendButton.enabled = true;
+    //sendButton.touchEnabled = true;
     isExporting = false;
+
+    return true;
 };
 
 
@@ -255,242 +258,130 @@ var data = [
 
 // create a table view for the logs
 var logTable = Ti.UI.createTableView();
+// set a flag to fix a bug where double tapping a row causes the detail page to load twice
+var isLoadingDetail = false;
 
-logTable.addEventListener('click',function(e) 
-{
-    // create a child view with the sample data
-    // TODO: organize the data into events
-    // inspect each event in the child view
-   
-/*
-    // because the android doesn't have a navbar with buttons,
-    // use the options dialog (action sheet) to reveal
-    // log inspection and upload functions
-    var optionsDialog = Titanium.UI.createOptionDialog({
-        options:['Inspect data', 'Email Log', 'Delete Log', 'Cancel'],
-        destructive:2,
-        cancel:3,
-        title:'Manage Log'
-    });
-
-
-    // TODO: add a listener to conditionally act on the response.
-    // This may be better suited to display differently based on each platform's
-    // UX paradigms.
-    optionsDialog.addEventListener('click',function(oe){
-        // these properties aren't being provided correctly.
-        if(oe.cancel == true) { 
-            Ti.API.info('Cancel button pressed');
-            return; 
-        }
-        if(oe.destructive == true) {
-            // delete this log file
-            // forward the event to the delete listener
-            Ti.API.info('Delete Log button pressed.');
-            logTable.fireEvent('delete',e);
-            Ti.API.info('fired a synthesized delete event to logTable');
-        } else {
-            switch(oe.index) {
-                case 0:
-                    Ti.API.info('Button 0 pressed.');
-                    // Inspect this log data 
-                    displayDetail();
-                    break;
-                case 1:
-                    Ti.API.info('Button 1 pressed.');
-                    // email / upload this log
-                    actInd.show();
-                    toggleSelection(true);
-                    sendLog();
-                    toggleSelection(false);
-                    actInd.hide();
-                    break;
-                case 2:
-                    // delete this log file
-                    // forward the event to the delete listener
-                    Ti.API.info('Delete Log button pressed for event: '+e.row.eventID);
-                    deleteEvent(e.row.eventID);
-                    toggleSelection(false);
-                    break;
-                case 3:
-                    Ti.API.info('Cancel button pressed');
-                    toggleSelection(false);
-                    break;
-
-                default:
-                    Ti.API.info('Default case in options dialog.');
-                    // this shouldn't happen
-                    toggleSelection(false);
-                    return;
-            }
-        }
-
-    });
-
-
-    // Ti.API.info('Showing the options dialog');
-    // optionsDialog.show();
-*/
-
-    // no longer displaying the action sheet...
-    // just reveal the detail page
-    displayDetail();
-
-   function displayDetail() { 
-        var newwin = Titanium.UI.createWindow({
-			title:'Log Summary',
-            backgroundColor:'#ccc',
-            barColor:orangeColor
-		});
-
-        // set a custom property to be able to identify this as a detail window
-        newwin.isDetailWindow = true;
-
-                
-        // add a send action button
-        var sendButton = Titanium.UI.createButton();
-        // use special button icon if on iPhone
-        if(Ti.Platform.name == 'iPhone OS'){
-            sendButton.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
-            newwin.rightNavButton = sendButton;
-        } else {
-            sendButton.title = 'Send';
-            // TODO: figure out a solution for android
-            // Menu?
-        }
-        //TODO: should this display the options dialog?
-        sendButton.addEventListener('click',function(){sendLog({eventID:e.rowData.eventID});});
-
-        // This is where we have to query the database and calculate and metrics needed
-        // TODO: *very* close to having to extract the log data into columns
-        var logDB = Ti.Database.open('log.db');
-
-        // get the first item
-        var rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID ASC LIMIT 1',e.rowData.logID);    
-        var firstSample = JSON.parse(rows.fieldByName('DATA'));
-        rows.close();
-        // get the last item
-        rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID DESC LIMIT 1',e.rowData.logID);    
-        var lastSample = JSON.parse(rows.fieldByName('DATA'));
-        rows.close();
-
-        // get every nth item
-        rows = logDB.execute('SELECT * FROM LOGDATA WHERE (id = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',e.rowData.logID);
-        var tmpdataset = [];
-        while(rows.isValidRow()){
-            tmpdataset.push(rows.fieldByName('DATA'));
-            rows.next();
-        }
-        Ti.API.info('Got remaining data points, count: '+tmpdataset.length);
-
-        rows.close();
-        logDB.close();
-        Ti.API.info('Got the first and last items from the current log');
-
-        Ti.API.info('First sample: '+ JSON.stringify(firstSample));
-        Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
-
-        // now parse that data
-        var dataset = []; 
-        for(var d in tmpdataset){
-            dataset.push(JSON.parse(tmpdataset[d]));
-        }
-        Ti.API.info('Parsed dataset has count: '+dataset.length);
-
-        // construct the table view with the groupings here.
-        var summaryTable = Ti.UI.createTableView({
-            backgroundColor:'#ccc',
-            headerTitle:e.rowData.name,
-            style:Titanium.UI.iPhone.TableViewStyle.GROUPED
-        });
-
-        // create the data for the table
-        var summaryData = [];
-        var mapRow = addMapRow({first:firstSample,last:lastSample,data:dataset}); // TODO: figure a better data delivery method
-
-        //mapRow.header = e.rowData.title;
-        summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
-       
-        //var metricsSection = Titanium.UI.createTableViewSection();
-        //metricsSection.headerTitle = "Metrics";
-
-        var firstRow = addSummaryRow('Duration',e.rowData.durationString);
-        firstRow.header = "Metrics";
-        summaryData.push(firstRow);
-      
-        // TODO: how to change this if the distance units are changed?
-        summaryData.push(addSummaryRow('Distance',e.rowData.distanceString));
-        summaryData.push(addSummaryRow('Average speed',e.rowData.avgSpeedString));
-        //summaryData.push(addSummaryRow('Altitude gain','xx'));
-        //summaryData.push(addSummaryRow('Average loudness','xx'));
-        //summaryData.push(addSummaryRow('Bumpiness factor','xx'));
-
-        // add the delete log button
-        // TODO: make this a big red button, and link to the delete logic
-        // including the alert view prompts
-        var deleteButton = Titanium.UI.createButton({
-            title:'Delete Log',
-            font:{fontSize:20,fontWeight:'bold'},
-            height:45,
-            width:300,
-            backgroundImage:'../images/button_red-150x45.png',
-            borderRadius:10
-        });
-        deleteButton.addEventListener('click',function() {
-            Ti.API.info('Delete button (detail view) clicked for eventID: '+e.rowData.eventID);
-            deleteEvent(e.rowData.eventID,newwin); // second arg to close the current window
-            //Ti.API.info('Event should have been deleted');
-        });
-
-        var deleteRow = Ti.UI.createTableViewRow();
-        deleteRow.header = ''; // nieve way to add a new section to the table
-        deleteRow.add(deleteButton);
-        summaryData.push(deleteRow);
-
-        summaryTable.setData(summaryData);
-        Ti.API.info('Created summaryTable and added summary data rows');
-        
-        newwin.add(summaryTable);
-
-		Titanium.UI.currentTab.open(newwin,{animated:true});
-   }
-    
-    function toggleSelection(force) {
-        // toggle the checked status of this row
-        if(force == null) // actually perform a toggle
-        {
-            force = (e.row.hasCheck == null || e.row.hasCheck == false);
-        }
-
-       if(force === true){ // (e.row.hasCheck == null || e.row.hasCheck == false)) {
-           var data = e.row;
-           //logTable.updateRow(e.index,data);
-            data.hasCheck = true;
-            //data.hasDetail = false;
-
-            var evt = data.eventID;
-            selectedEvents.push(evt);
-
-            Ti.API.info('row '+e.index+' selected. ('+data.eventID+')');
-       } else {
-           var data = e.row;
-           //data.hasDetail = true;
-           data.hasCheck = false;
-           //logTable.updateRow(e.index,data);
-           
-           // remove this selected item
-           // TODO: change this to use indexOf()
-           for (var i = 0; i < selectedEvents.length; i++) {
-               if(selectedEvents[i] == data.eventID) {
-                selectedEvents.splice(i,1); // remove this element
-                Ti.API.info('row '+e.index+' deselected. ('+data.eventID+')');
-               }
-           };
-       }
-    }
-
-});
-
+//logTable.addEventListener('click',function(e) 
+//{
+//    // create a child view with the sample data
+//    // TODO: organize the data into events
+//    // inspect each event in the child view
+//   
+///*
+//    // because the android doesn't have a navbar with buttons,
+//    // use the options dialog (action sheet) to reveal
+//    // log inspection and upload functions
+//    var optionsDialog = Titanium.UI.createOptionDialog({
+//        options:['Inspect data', 'Email Log', 'Delete Log', 'Cancel'],
+//        destructive:2,
+//        cancel:3,
+//        title:'Manage Log'
+//    });
+//
+//
+//    // TODO: add a listener to conditionally act on the response.
+//    // This may be better suited to display differently based on each platform's
+//    // UX paradigms.
+//    optionsDialog.addEventListener('click',function(oe){
+//        // these properties aren't being provided correctly.
+//        if(oe.cancel == true) { 
+//            Ti.API.info('Cancel button pressed');
+//            return; 
+//        }
+//        if(oe.destructive == true) {
+//            // delete this log file
+//            // forward the event to the delete listener
+//            Ti.API.info('Delete Log button pressed.');
+//            logTable.fireEvent('delete',e);
+//            Ti.API.info('fired a synthesized delete event to logTable');
+//        } else {
+//            switch(oe.index) {
+//                case 0:
+//                    Ti.API.info('Button 0 pressed.');
+//                    // Inspect this log data 
+//                    displayDetail();
+//                    break;
+//                case 1:
+//                    Ti.API.info('Button 1 pressed.');
+//                    // email / upload this log
+//                    actInd.show();
+//                    toggleSelection(true);
+//                    sendLog();
+//                    toggleSelection(false);
+//                    actInd.hide();
+//                    break;
+//                case 2:
+//                    // delete this log file
+//                    // forward the event to the delete listener
+//                    Ti.API.info('Delete Log button pressed for event: '+e.row.eventID);
+//                    deleteEvent(e.row.eventID);
+//                    toggleSelection(false);
+//                    break;
+//                case 3:
+//                    Ti.API.info('Cancel button pressed');
+//                    toggleSelection(false);
+//                    break;
+//
+//                default:
+//                    Ti.API.info('Default case in options dialog.');
+//                    // this shouldn't happen
+//                    toggleSelection(false);
+//                    return;
+//            }
+//        }
+//
+//    });
+//
+//
+//    // Ti.API.info('Showing the options dialog');
+//    // optionsDialog.show();
+//*/
+//
+//    // disable the double tap and showing the same log twice
+//    if(isLoadingDetail == true) return;
+//    isLoadingDetail = true;
+//
+//    // no longer displaying the action sheet...
+//    // just reveal the detail page
+//    displayDetail();
+//
+//       
+//    function toggleSelection(force) {
+//        // toggle the checked status of this row
+//        if(force == null) // actually perform a toggle
+//        {
+//            force = (e.row.hasCheck == null || e.row.hasCheck == false);
+//        }
+//
+//       if(force === true){ // (e.row.hasCheck == null || e.row.hasCheck == false)) {
+//           var data = e.row;
+//           //logTable.updateRow(e.index,data);
+//            data.hasCheck = true;
+//            //data.hasDetail = false;
+//
+//            var evt = data.eventID;
+//            selectedEvents.push(evt);
+//
+//            Ti.API.info('row '+e.index+' selected. ('+data.eventID+')');
+//       } else {
+//           var data = e.row;
+//           //data.hasDetail = true;
+//           data.hasCheck = false;
+//           //logTable.updateRow(e.index,data);
+//           
+//           // remove this selected item
+//           // TODO: change this to use indexOf()
+//           for (var i = 0; i < selectedEvents.length; i++) {
+//               if(selectedEvents[i] == data.eventID) {
+//                selectedEvents.splice(i,1); // remove this element
+//                Ti.API.info('row '+e.index+' deselected. ('+data.eventID+')');
+//               }
+//           };
+//       }
+//    }
+//
+//});
+//
 // add delete event listener
 logTable.addEventListener('delete',function(e)
 {
@@ -656,10 +547,162 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     //row.hasCheck = rowData.hasCheck;
 
 	row.className = 'logrow';
-	
+
+    row.addEventListener('singletap',function(e){
+        if(isLoadingDetail == true) return; // eliminate the double click
+        isLoadingDetail = true;
+
+//        row.touchEnabled = false;
+//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
+
+        displayDetail(row);
+
+//        row.touchEnabled = true;
+//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.DEFAULT
+    });
+
     Ti.API.info('Finished setting up the row. Now returning it');
     return row;
 }
+
+
+function displayDetail(rowData) { 
+    var newwin = Titanium.UI.createWindow({
+        title:'Log Summary',
+        backgroundColor:'#ccc',
+        barColor:orangeColor
+    });
+
+    // set a custom property to be able to identify this as a detail window
+    newwin.isDetailWindow = true;
+
+            
+    // add a send action button
+    var sendButton = Titanium.UI.createButton();
+    // use special button icon if on iPhone
+    if(Ti.Platform.name == 'iPhone OS'){
+        sendButton.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
+        newwin.rightNavButton = sendButton;
+    } else {
+        sendButton.title = 'Send';
+        // TODO: figure out a solution for android
+        // Menu?
+    }
+    //TODO: should this display the options dialog?
+    sendButton.addEventListener('click',function(){
+        Ti.API.info('Send button pressed. isExporting == '+isExporting);
+        
+        // temporarily disable the button to prevent a double-tap
+        sendButton.enabled = false;
+        sendButton.touchEnabled = false;
+
+        sendLog({eventID:rowData.eventID});
+
+        setTimeout(function() {
+            sendButton.enabled = true;
+            sendButton.touchEnabled = true;
+        },1000);
+    });
+
+    // This is where we have to query the database and calculate and metrics needed
+    // TODO: *very* close to having to extract the log data into columns
+    var logDB = Ti.Database.open('log.db');
+
+    // get the first item
+    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID ASC LIMIT 1',rowData.logID);    
+    var firstSample = JSON.parse(rows.fieldByName('DATA'));
+    rows.close();
+    // get the last item
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID DESC LIMIT 1',rowData.logID);    
+    var lastSample = JSON.parse(rows.fieldByName('DATA'));
+    rows.close();
+
+    // get every nth item
+    // assuming sequential ROWISs
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE (id = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',rowData.logID);
+    var tmpdataset = [];
+    while(rows.isValidRow()){
+        tmpdataset.push(rows.fieldByName('DATA'));
+        rows.next();
+    }
+    Ti.API.info('Got remaining data points, count: '+tmpdataset.length);
+
+    rows.close();
+    logDB.close();
+    Ti.API.info('Got the first and last items from the current log');
+
+    Ti.API.info('First sample: '+ JSON.stringify(firstSample));
+    Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
+
+    // now parse that data
+    var dataset = []; 
+    for(var d in tmpdataset){
+        dataset.push(JSON.parse(tmpdataset[d]));
+    }
+    Ti.API.info('Parsed dataset has count: '+dataset.length);
+
+    // construct the table view with the groupings here.
+    var summaryTable = Ti.UI.createTableView({
+        backgroundColor:'#ccc',
+        headerTitle:rowData.name,
+        style:Titanium.UI.iPhone.TableViewStyle.GROUPED
+    });
+
+    // create the data for the table
+    var summaryData = [];
+    var mapRow = addMapRow({first:firstSample,last:lastSample,data:dataset}); // TODO: figure a better data delivery method
+
+    //mapRow.header = rowData.title;
+    summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
+   
+    //var metricsSection = Titanium.UI.createTableViewSection();
+    //metricsSection.headerTitle = "Metrics";
+
+    var firstRow = addSummaryRow('Duration',rowData.durationString);
+    firstRow.header = "Metrics";
+    summaryData.push(firstRow);
+  
+    // TODO: how to change this if the distance units are changed?
+    summaryData.push(addSummaryRow('Distance',rowData.distanceString));
+    summaryData.push(addSummaryRow('Average speed',rowData.avgSpeedString));
+    //summaryData.push(addSummaryRow('Altitude gain','xx'));
+    //summaryData.push(addSummaryRow('Average loudness','xx'));
+    //summaryData.push(addSummaryRow('Bumpiness factor','xx'));
+
+    // add the delete log button
+    // TODO: make this a big red button, and link to the delete logic
+    // including the alert view prompts
+    var deleteButton = Titanium.UI.createButton({
+        title:'Delete Log',
+        font:{fontSize:20,fontWeight:'bold'},
+        height:45,
+        width:300,
+        backgroundImage:'../images/button_red-150x45.png',
+        borderRadius:10
+    });
+    deleteButton.addEventListener('click',function() {
+        Ti.API.info('Delete button (detail view) clicked for eventID: '+rowData.eventID);
+        deleteEvent(rowData.eventID,newwin); // second arg to close the current window
+        //Ti.API.info('Event should have been deleted');
+    });
+
+    var deleteRow = Ti.UI.createTableViewRow();
+    deleteRow.header = ''; // nieve way to add a new section to the table
+    deleteRow.add(deleteButton);
+    summaryData.push(deleteRow);
+
+    summaryTable.setData(summaryData);
+    Ti.API.info('Created summaryTable and added summary data rows');
+    
+    newwin.add(summaryTable);
+
+    Titanium.UI.currentTab.open(newwin,{animated:true});
+
+    // reset the flag to allow another detail page to load
+    setTimeout(function() {isLoadingDetail = false;},1000);
+
+}
+
 
 
 // call up the log list from the database
@@ -833,7 +876,7 @@ function addMapRow (logData) {
         latitude:logData.first.lat,
         longitude:logData.first.lon,
         title:"Log start",
-        //subtitle:'Mountain View, CA',
+        subtitle:new Date(logData.first.timestamp).toLocaleString(),
         pincolor:Titanium.Map.ANNOTATION_GREEN,
         animate:true,
         //leftButton: '../images/appcelerator_small.png',
@@ -845,7 +888,7 @@ function addMapRow (logData) {
         latitude:logData.last.lat,
         longitude:logData.last.lon,
         title:"Log end",
-        //subtitle:'Mountain View, CA',
+        subtitle:new Date(logData.last.timestamp).toLocaleString(),
         pincolor:Titanium.Map.ANNOTATION_RED,
         animate:true,
         //leftButton: '../images/appcelerator_small.png',
