@@ -100,7 +100,7 @@ function sendLog(params){
     //var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID IN (?)',eventList);
     //var rows = logDB.execute('SELECT * FROM LOGDATA WHERE EVENTID = ?',eventListArray[0]);
     var rows = logDB.execute('SELECT * FROM LOGMETA WHERE EVENTID = ?',eventListArray[0]);
-    var id = rows.fieldByName('id');
+    var logid = rows.fieldByName('logid');
 
     // also want to insert the event and device id into the exported data:
     var eventID = rows.fieldByName('eventid');
@@ -112,7 +112,7 @@ function sendLog(params){
     // convert to a Date object
     startDate = new Date(startDate*1000);
 
-    rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ?',id);    
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ?',logid);    
     // the rowCount seems to be limited to 1000 rows. why?
     // The problem seems alleviated after two changes:
     // 1. commented out the getRowCount() call.
@@ -428,12 +428,12 @@ function deleteEvent(eventID,closeWindow) {
 
 
             // run the SQL statement to delete the row.
-            var rows = logDB.execute('SELECT id FROM LOGMETA WHERE eventid = ?',eventID);
-            var id = rows.fieldByName('id');
+            var rows = logDB.execute('SELECT logid FROM LOGMETA WHERE eventid = ?',eventID);
+            var logid = rows.fieldByName('logid');
             rows.close();
 
-            logDB.execute('DELETE FROM LOGDATA WHERE id = ?',id);
-            logDB.execute('DELETE FROM LOGMETA WHERE id = ?',id);
+            logDB.execute('DELETE FROM LOGDATA WHERE logid = ?',logid);
+            logDB.execute('DELETE FROM LOGMETA WHERE logid = ?',logid);
             // is there a way to verify the process?
 
             logDB.close();
@@ -609,17 +609,17 @@ function displayDetail(rowData) {
     var logDB = Ti.Database.open('log.db');
 
     // get the first item
-    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID ASC LIMIT 1',rowData.logID);    
+    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID ASC LIMIT 1',rowData.logID);    
     var firstSample = JSON.parse(rows.fieldByName('DATA'));
     rows.close();
     // get the last item
-    rows = logDB.execute('SELECT * FROM LOGDATA WHERE id = ? ORDER BY ROWID DESC LIMIT 1',rowData.logID);    
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID DESC LIMIT 1',rowData.logID);    
     var lastSample = JSON.parse(rows.fieldByName('DATA'));
     rows.close();
 
     // get every nth item
     // assuming sequential ROWISs
-    rows = logDB.execute('SELECT * FROM LOGDATA WHERE (id = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',rowData.logID);
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE (logid = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',rowData.logID);
     var tmpdataset = [];
     while(rows.isValidRow()){
         tmpdataset.push(rows.fieldByName('DATA'));
@@ -743,7 +743,7 @@ function loadLogs () {
                                 timestamp:thisTimestamp,
                                 duration:rows.fieldByName('duration'),
                                 distance:rows.fieldByName('distance'),
-                                logID:rows.fieldByName('id')
+                                logID:rows.fieldByName('logid')
                                 };
 
             /* // notes on creating custom row layouts

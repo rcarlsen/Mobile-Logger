@@ -11,10 +11,12 @@ function uploadSample (sample) {
     {
         //Ti.API.info('POSTed sample: '+JSON.stringify(sample));
         Ti.API.info('With response: '+this.responseText);
+        return this.responseText;
     };
     xhr.onerror = function()
     {
         Ti.API.info('Upload error: '+this.responseText);
+        return this.responseText;
     };
     // TODO: get the url from the properties
     xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSample");
@@ -32,10 +34,12 @@ function bulkUpload (samples) {
 
         //TODO: the response is an array of the new doc ids
         //we need to store those docs ids to prevent duplicate docs
+        return this.responseText;
     };
     xhr.onerror = function()
     {
         Ti.API.info('Upload error: '+this.responseText);
+        return this.responseText;
     };
     // TODO: get the url from the properties
     var out = {docs:samples};

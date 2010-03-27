@@ -418,11 +418,11 @@ function resetValues (restore) {
         Ti.API.info('Inserted the new event into the DB.');
 
         // get the newly created id field
-        var rows = logDB.execute('SELECT id from LOGMETA WHERE eventid = ?',eventID);
-        Ti.API.info('Queried LOGMETA for id of eventid: '+eventID);
+        var rows = logDB.execute('SELECT logid from LOGMETA WHERE eventid = ?',eventID);
+        Ti.API.info('Queried LOGMETA for logid of eventid: '+eventID);
 
         if(rows.isValidRow()){ // should only return one row
-            logID = rows.fieldByName('id');
+            logID = rows.fieldByName('logid');
             Ti.API.info('logID: '+logID);
         
         } else {
@@ -437,7 +437,7 @@ function resetValues (restore) {
         Ti.API.info('Retrieving the past event');
 
         // retrieve the last event and continue logging.
-        var rows = logDB.execute('SELECT id,eventid,startdate,duration,distance FROM LOGMETA ORDER BY startdate DESC LIMIT 1');
+        var rows = logDB.execute('SELECT logid,eventid,startdate,duration,distance FROM LOGMETA ORDER BY startdate DESC LIMIT 1');
         Ti.API.info('Queried the DB for the most recent event');
 
         if(rows.isValidRow()){
@@ -538,7 +538,7 @@ function recordSample() {
     Ti.API.info('Opened log.db');
 
     // insert the current sample in the logdata table
-    logDB.execute('INSERT INTO LOGDATA (id,data) VALUES(?,?)',logID,JSON.stringify(currentSample));
+    logDB.execute('INSERT INTO LOGDATA (logid,data) VALUES(?,?)',logID,JSON.stringify(currentSample));
     Ti.API.info('Inserted sample into LOGDATA with logID: '+logID);
 
     // insert updated meta data into logmeta table
