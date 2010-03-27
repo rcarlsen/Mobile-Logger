@@ -260,6 +260,10 @@ var data = [
 var logTable = Ti.UI.createTableView();
 // set a flag to fix a bug where double tapping a row causes the detail page to load twice
 var isLoadingDetail = false;
+var detailPageCount = 0; //only ever want this to be <=1
+
+// don't do anything on click, singletap only.
+logTable.addEventListener('click',function(){});
 
 //logTable.addEventListener('click',function(e) 
 //{
@@ -548,9 +552,9 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 
 	row.className = 'logrow';
 
-    row.addEventListener('singletap',function(e){
-        if(isLoadingDetail == true) return; // eliminate the double click
-        isLoadingDetail = true;
+    row.addEventListener('click',function(e){
+        if(detailPageCount>=1) return;
+        detailPageCount++;
 
 //        row.touchEnabled = false;
 //        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
@@ -576,6 +580,8 @@ function displayDetail(rowData) {
     // set a custom property to be able to identify this as a detail window
     newwin.isDetailWindow = true;
 
+    // still trying to eliminate the double detail page
+    newwin.addEventListener('close',function(){detailPageCount--});
             
     // add a send action button
     var sendButton = Titanium.UI.createButton();
@@ -699,7 +705,7 @@ function displayDetail(rowData) {
     Titanium.UI.currentTab.open(newwin,{animated:true});
 
     // reset the flag to allow another detail page to load
-    setTimeout(function() {isLoadingDetail = false;},1000);
+    //setTimeout(function() {isLoadingDetail = false;},1000);
 
 }
 

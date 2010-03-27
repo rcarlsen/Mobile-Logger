@@ -35,7 +35,7 @@ inputData.push(exportRow);
 // Set up an about message
 var aboutString = 
 'Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance. '+
-'Export logs via e-mail in CSV, JSON or Golden Cheetah format.\n\n'+
+'Export logs via e-mail in CSV, JSON or Golden Cheetah format. Data can be automatically uploaded while logging to: http://mobilelogger.robertcarlsen.net\n\n'+
 'By default, logs contain a unique identifier for this device. It may be omitted by enabling the "Anonymous Export" option.\n\n'+
 'This application has been released as open source software under the GPLv3. '+
 'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+

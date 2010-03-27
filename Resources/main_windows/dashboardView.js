@@ -506,11 +506,6 @@ function startLogging(restore) {
 function stopLogging() {
     Ti.API.info('In the stopLogging method');
    
-    // push the final samples to the server
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        sendBuffer();
-    }
-
     // store this eventid in the app properties
     Ti.App.Properties.setString('eventid','');
     loggingState = false;
@@ -520,7 +515,16 @@ function stopLogging() {
 
     clearInterval(clockInterval);
     clockInterval = 0;
-  
+ 
+    // push the final samples to the server
+    if(Ti.App.Properties.getBool('uploadEnabled',true)){
+        try{
+            sendBuffer(uploadBuffer);
+        } catch(err) {
+            Ti.API.info('Error uploading the final buffer');
+        }
+    }
+
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
 };
@@ -535,18 +539,22 @@ function recordSample() {
     currentSample.timestamp = new Date().getTime();
 
     var logDB = Ti.Database.open("log.db");
-    Ti.API.info('Opened log.db');
+    //Ti.API.info('Opened log.db');
+
+    // create a Document ID for this sample
+    var docID = Titanium.Utils.md5HexDigest(eventID+currentSample.timestamp);
+    //Ti.API.info('Generated docID: '+docID);
 
     // insert the current sample in the logdata table
-    logDB.execute('INSERT INTO LOGDATA (logid,data) VALUES(?,?)',logID,JSON.stringify(currentSample));
-    Ti.API.info('Inserted sample into LOGDATA with logID: '+logID);
+    logDB.execute('INSERT INTO LOGDATA (_id,logid,data) VALUES(?,?,?)',docID,logID,JSON.stringify(currentSample));
+    //Ti.API.info('Inserted sample into LOGDATA with logID: '+logID);
 
     // insert updated meta data into logmeta table
     logDB.execute('UPDATE LOGMETA SET distance = ? , duration = ? WHERE eventid = ?',eventDistance,eventDuration,eventID);
-    Ti.API.info('Updated LOGMETA for eventID: '+eventID);
+    //Ti.API.info('Updated LOGMETA for eventID: '+eventID);
 
     logDB.close();
-    Ti.API.info('Closed log.db');
+    //Ti.API.info('Closed log.db');
 
     // pulse red while recording
     //animateLocationView();
@@ -558,34 +566,73 @@ function recordSample() {
     // DEBUG: testing only
     // TODO: abstract / buffer this process.
     if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        var out = currentSample;
-        // make sure that each field is a number
-        for(var f in currentSample){
-            out[f] = parseFloat(currentSample[f]);
-        }
-
-        // add the extra fields
-        out.eventID = eventID;
-        if(!Ti.App.Properties.getBool('omitDeviceID',false)){
-            out.deviceID = deviceID;
-        } else {
-            out.deviceID = -1;
-        }
-
         // add this sample to the upload buffer:
-        uploadBuffer.push(out);
+        uploadBuffer.push(docID);
         if(uploadBuffer.length >= uploadTrigger){
-            sendBuffer();
+            try{
+                sendBuffer(uploadBuffer);
+                // clear the buffer
+                uploadBuffer = [];
+            } catch(err) {
+                Ti.API.info('Error uploading the sample buffer.');    
+            }
         }
     }
 };
 
-function sendBuffer() {
-    // send this batch of samples
-    bulkUpload(uploadBuffer);
+function sendBuffer(docBuffer) {
+    if(docBuffer == null || docBuffer.length == 0) return;
 
-    // clear the buffer
-    uploadBuffer = [];
+    Ti.API.info('Sending Buffer');
+    // send the batch of docIDs in the uploadBuffer
+    // need to retrieve them from the database 
+    var logDB = Ti.Database.open("log.db");
+ 
+    // using an array just isn't working, despite the documentation
+    //var rows = logDB.execute("SELECT _id,DATA FROM LOGDATA WHERE _id IN (?)",docString);
+
+    // instead, manually construct the SQL statement
+    var docString = docBuffer.join("','");
+    var sql = "SELECT * FROM LOGDATA WHERE _id IN ('"+docString+"')";
+    var rows = logDB.execute(sql);
+    
+    var docs = [];
+    var useDeviceID = Ti.App.Properties.getBool('omitDeviceID',false);
+    
+    while(rows.isValidRow()) {
+        // get the data from the row
+        var thisDoc = JSON.parse(rows.fieldByName('DATA'));
+       
+        // disabled at the moment, but ensure that uploaded records are numbers, not strings
+        // make sure that each field is a number
+        //for(var f in currentSample){
+        //    out[f] = parseFloat(currentSample[f]);
+        //}
+       
+        // add the docid
+        thisDoc._id = rows.fieldByName('_id');
+        // add the eventID
+        thisDoc.eventID = eventID;
+        // and the deviceID
+        if(!useDeviceID){
+            thisDoc.deviceID = deviceID;
+        } else {
+            thisDoc.deviceID = -1;
+        }
+        docs.push(thisDoc);
+
+        //Ti.API.info(JSON.stringify(thisDoc));
+        rows.next();
+    }
+    rows.close();
+    logDB.close();
+
+    Ti.API.info('Prepared docs for upload: '+docs.length);
+
+    // send this batch of samples
+    bulkUpload(docs);
+
+    Ti.API.info('Finished upload');
 }
 
 // end logging methods//
@@ -1173,12 +1220,12 @@ function updateLocationData(e) {
     // 5	    0.00001	1.11 m
     // 
     // update the current sample object with the new data:
-    currentSample.lat = latitude.toFixed(5);
-    currentSample.lon = longitude.toFixed(5);
+    currentSample.lat = parseFloat(latitude.toFixed(5));
+    currentSample.lon = parseFloat(longitude.toFixed(5));
     currentSample.alt = altitude;
-    currentSample.locAcc = accuracy.toFixed(5);
-    currentSample.altAcc = altitudeAccuracy.toFixed(2);
-    currentSample.speed = speed.toFixed(2);
+    currentSample.locAcc = parseFloat(accuracy.toFixed(5));
+    currentSample.altAcc = parseFloat(altitudeAccuracy.toFixed(2));
+    currentSample.speed = parseFloat(speed.toFixed(2));
     currentSample.timestamp = timestamp;
 
     if(!Titanium.Geolocation.hasCompass){

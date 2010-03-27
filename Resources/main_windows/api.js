@@ -10,7 +10,7 @@ function uploadSample (sample) {
     xhr.onload = function()
     {
         //Ti.API.info('POSTed sample: '+JSON.stringify(sample));
-        Ti.API.info('With response: '+this.responseText);
+        //Ti.API.info('With response: '+this.responseText);
         return this.responseText;
     };
     xhr.onerror = function()
@@ -30,7 +30,7 @@ function bulkUpload (samples) {
     xhr.onload = function()
     {
         //Ti.API.info('POSTed samples: '+JSON.stringify(sample));
-        Ti.API.info('With response: '+this.responseText);
+        //Ti.API.info('With response: '+this.responseText);
 
         //TODO: the response is an array of the new doc ids
         //we need to store those docs ids to prevent duplicate docs
