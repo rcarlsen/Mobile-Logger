@@ -7,7 +7,7 @@
 <url>http://robertcarlsen.net</url>
 <description>Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance.</description>
 <copyright>2010 by Robert Carlsen</copyright>
-<icon>appicon.png</icon>
+<icon>Icon.png</icon>
     <persistent-wifi>false</persistent-wifi>
     <prerendered-icon>false</prerendered-icon>
     <statusbar-style>default</statusbar-style>

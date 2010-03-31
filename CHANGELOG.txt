@@ -1,1 +1,2 @@
-Place your change log text here.  This file will be incorporated with your app at package time.
+3/31/2010
+Version 1.0 release.
