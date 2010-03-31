@@ -33,14 +33,15 @@ var orangeColor = '#d56009';
 var inputData = [];
 
 var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
-networkRow.header = 'Network';
-networkRow.footer = 'Send log data to Mobile Logger server';
+//networkRow.header = 'Network';
+networkRow.footer = 'Send data to the Mobile Logger server';
 inputData.push(networkRow);
 //inputData.push(addControlRow('Server'));
 //inputData.push(addControlRow('Database'));
 
 var resumeRow = addControlRow('Auto-Resume Logging','autoResume',false);
-resumeRow.header = 'Configuration';
+//resumeRow.header = 'Configuration';
+resumeRow.header = '';
 inputData.push(resumeRow);
 inputData.push(addControlRow('Metric Units','useMetric'));
 inputData.push(addControlRow('Monitor Sound Levels','monitorSound',true));
@@ -48,7 +49,9 @@ inputData.push(addControlRow('Monitor Sound Levels','monitorSound',true));
 // should this actually modify the stored data in the db,
 // or control whether or not the user ID field is included
 // in uploaded or exported data?
-inputData.push(addControlRow('Anonymous Export','omitDeviceID',false));
+var anonRow = addControlRow('Anonymous Export','omitDeviceID',false);
+anonRow.header = '';
+inputData.push(anonRow);
 
 // trying to get the export to work
 var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah'},'csv');
@@ -213,7 +216,7 @@ function addAboutRow(label,value)
 	var row = Ti.UI.createTableViewRow({height:50});
     row.backgroundColor = '#fff';
     row.hasChild = true;
-    row.header = ' ';
+    row.header = '';
 
     // add a label to the left
     // should be bold

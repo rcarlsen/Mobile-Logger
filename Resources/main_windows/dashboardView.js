@@ -580,8 +580,8 @@ function recordSample() {
     // pulse red while recording
     //animateLocationView();
 
-    Titanium.API.info("Current sample recorded to db");
-    Titanium.API.info('Time: '+currentSample.timestamp);
+    //Titanium.API.info("Current sample recorded to db");
+    //Titanium.API.info('Time: '+currentSample.timestamp);
 
     // upload the sample
     // DEBUG: testing only
