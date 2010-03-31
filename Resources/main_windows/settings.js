@@ -32,13 +32,14 @@ var orangeColor = '#d56009';
 
 var inputData = [];
 
-var networkRow = addControlRow('Auto-upload','uploadEnabled',true);
+var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
 networkRow.header = 'Network';
+networkRow.footer = 'Send log data to Mobile Logger server';
 inputData.push(networkRow);
 //inputData.push(addControlRow('Server'));
 //inputData.push(addControlRow('Database'));
 
-var resumeRow = addControlRow('Auto-resume','autoResume',false);
+var resumeRow = addControlRow('Auto-Resume Logging','autoResume',false);
 resumeRow.header = 'Configuration';
 inputData.push(resumeRow);
 inputData.push(addControlRow('Metric Units','useMetric'));

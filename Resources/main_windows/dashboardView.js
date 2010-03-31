@@ -30,7 +30,7 @@ var win = Ti.UI.currentWindow;
 
 // set up a listener to act every time the window is loaded
 win.addEventListener('focus',function() {
-    Ti.API.info('Dashboard focus event');
+    //Ti.API.info('Dashboard focus event');
     setUnits();
 
     // set the audio monitoring state
@@ -44,7 +44,7 @@ win.addEventListener('open',function() {
     // is this the first event to trigger?
     // if not, the setup needs to happen first.
     // maybe in app.js.
-    Ti.API.info('In the window open event. About to setup DB.');
+    //Ti.API.info('In the window open event. About to setup DB.');
     setupDatabase();
     
     // check to see if the the event was open when the app quit
@@ -214,7 +214,7 @@ var speedlabel = Titanium.UI.createLabel({
 	font:{fontSize:64,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:70
+    top:60
 });
 
 var speedUnitLabel = Ti.UI.createLabel({
@@ -222,7 +222,7 @@ var speedUnitLabel = Ti.UI.createLabel({
    	font:{fontSize:22,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
     height:'auto',
-    top:135,
+    top:125,
     text:speedUnits
 });
 
@@ -604,7 +604,7 @@ function recordSample() {
 function sendBuffer(docBuffer) {
     if(docBuffer == null || docBuffer.length == 0) return;
 
-    Ti.API.info('Sending Buffer');
+    //Ti.API.info('Sending Buffer');
     // send the batch of docIDs in the uploadBuffer
     // need to retrieve them from the database 
     var logDB = Ti.Database.open("log.db");
@@ -648,12 +648,12 @@ function sendBuffer(docBuffer) {
     rows.close();
     logDB.close();
 
-    Ti.API.info('Prepared docs for upload: '+docs.length);
+    //Ti.API.info('Prepared docs for upload: '+docs.length);
 
     // send this batch of samples
     bulkUpload(docs);
 
-    Ti.API.info('Finished upload');
+    //Ti.API.info('Finished upload');
 }
 
 // end logging methods//
@@ -701,21 +701,21 @@ loggingSwitch.addEventListener('change',function(e) {
         Titanium.API.info("Logging switch activated");
 
         var logDB = Ti.Database.open("log.db");
-        Ti.API.info('Opened log.db in loggingSwitch()');
+        //Ti.API.info('Opened log.db in loggingSwitch()');
 
         var rows = logDB.execute('SELECT eventid,startdate FROM LOGMETA');
-        Ti.API.info('Queried LOGMETA for event list');
+        //Ti.API.info('Queried LOGMETA for event list');
 
         var eventCount = rows.rowCount;
 
         rows.close();
-        Ti.API.info('Closed the resultSet in loggingSwitch. row count: '+eventCount);
+        //Ti.API.info('Closed the resultSet in loggingSwitch. row count: '+eventCount);
         
         logDB.close();
-        Ti.API.info('Closed log.db');
+        //Ti.API.info('Closed log.db');
 
         if(eventCount > 0) {
-            Ti.API.info('row count > 0');
+            //Ti.API.info('row count > 0');
 
             // there is at least one stored event, so prompt to continue it
             // TODO: use some logic on the startdate and current time to determine if we should prompt to continue.
@@ -746,7 +746,7 @@ loggingSwitch.addEventListener('change',function(e) {
 
             alertDialog1.show();   
         } else {
-            Ti.API.info('row count <= 0. call startLogging() for a new event');
+            //Ti.API.info('row count <= 0. call startLogging() for a new event');
             var result = startLogging();
             Ti.API.info('Result of startLogging(): '+ result);
             if(!result) sw.value = false;
@@ -893,10 +893,10 @@ win.add(reminderLabel);
 function toggleDisplayVisibility (state) {
     // toggle if no input.
     if(state == null) {
-        Ti.API.info('Dashboard view visible: '+dashboardView.visible);
+        //Ti.API.info('Dashboard view visible: '+dashboardView.visible);
         state = !dashboardView.visible;
     }
-    Ti.API.info('Toggling dashboard visible: '+state);
+    //Ti.API.info('Toggling dashboard visible: '+state);
 
     if(state == true) {
         reminderLabel.hide();
@@ -916,7 +916,7 @@ function toggleDisplayVisibility (state) {
         });
         dashboardView.animate(a);
     }
-    Ti.API.info('Finished toggling the dashboard visibility');
+    //Ti.API.info('Finished toggling the dashboard visibility');
 }
 
 
@@ -925,15 +925,15 @@ function updateDistanceLabel (delta) {
     // expects a ivar with the current distance
     eventDistance += delta;
 
-    Ti.API.info('Distance delta: '+delta);
-    Ti.API.info('Event distance: '+eventDistance);
+    //Ti.API.info('Distance delta: '+delta);
+    //Ti.API.info('Event distance: '+eventDistance);
 
     // convert the meters to an appropriate display unit. (miles only for now)
     // 1 meter = 0.000621371192 miles
     var displayDistance = eventDistance * distanceUnitValue; // miles
     //var displayDistance = eventDistance;
 
-    Ti.API.info('Display distance: '+displayDistance);
+    //Ti.API.info('Display distance: '+displayDistance);
     distanceLabel.text = parseFloat(displayDistance).toFixed(2);
 }
 
@@ -1224,7 +1224,7 @@ function updateLocationData(e) {
     if(loggingState == true && (currentSample.lon && currentSample.lat)) {
         var dist = calculateDistanceDelta({lon:currentSample.lon,lat:currentSample.lat},
                                           {lon:longitude,lat:latitude});
-        Ti.API.info('Sample distance: '+dist);
+        //Ti.API.info('Sample distance: '+dist);
         
         // distance display never updated.
         // Update: distance display seems to only show the delta
