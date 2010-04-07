@@ -25,7 +25,7 @@
 //
 
 function uploadSample (sample) {
-    if(sample == null) return;
+    if(sample == null) { return; }
 
     var xhr = Titanium.Network.createHTTPClient();
     xhr.onload = function()
@@ -45,7 +45,7 @@ function uploadSample (sample) {
 }
 
 function bulkUpload (samples) {
-    if(samples == null || samples.length == 0) return;
+    if(samples == null || samples.length == 0) { return; }
 
     var xhr = Titanium.Network.createHTTPClient();
     xhr.onload = function()

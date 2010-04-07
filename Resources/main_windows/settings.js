@@ -30,49 +30,10 @@ var win = Titanium.UI.currentWindow;
 var orangeColor = '#d56009';
 
 
-var inputData = [];
-
-var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
-//networkRow.header = 'Network';
-networkRow.footer = 'Send data to the Mobile Logger server';
-inputData.push(networkRow);
-//inputData.push(addControlRow('Server'));
-//inputData.push(addControlRow('Database'));
-
-var resumeRow = addControlRow('Auto-Resume Logging','autoResume',false);
-//resumeRow.header = 'Configuration';
-resumeRow.header = '';
-inputData.push(resumeRow);
-inputData.push(addControlRow('Metric Units','useMetric'));
-inputData.push(addControlRow('Monitor Sound Levels','monitorSound',true));
-
-// should this actually modify the stored data in the db,
-// or control whether or not the user ID field is included
-// in uploaded or exported data?
-var anonRow = addControlRow('Anonymous Export','omitDeviceID',false);
-anonRow.header = '';
-inputData.push(anonRow);
-
-// trying to get the export to work
-var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah'},'csv');
-inputData.push(exportRow);
-
-// Set up an about message
-var aboutString = 
-'Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance. '+
-'Export logs via e-mail in CSV, JSON or Golden Cheetah format. Data can be automatically uploaded while logging to: http://mobilelogger.robertcarlsen.net\n\n'+
-'By default, logs contain a unique identifier for this device. It may be omitted by enabling the "Anonymous Export" option.\n\n'+
-'This application has been released as open source software under the GPLv3. '+
-'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+
-'Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.';
-
-inputData.push(addAboutRow('About Mobile Logger',aboutString));
-
-
-// methods for creating custom rows
+// methods for creating custom rows:
 function addControlRow(label,property,initialValue)
 {
-    if(initialValue == null) initialValue = false;
+    if(initialValue == null) { initialValue = false; }
 
 	var row = Ti.UI.createTableViewRow({height:50});
     row.backgroundColor = '#fff';
@@ -116,7 +77,7 @@ function addControlRow(label,property,initialValue)
 
 function addExportRow(label,property,valuesList,initialValue)
 {
-    if(initialValue == null) initialValue = false;
+    if(initialValue == null) { initialValue = false; }
 
 	var row = Ti.UI.createTableViewRow({height:50});
     row.backgroundColor = '#fff';
@@ -160,13 +121,15 @@ function addExportRow(label,property,valuesList,initialValue)
             thisTable.backgroundColor = '#ccc';
             var data = [];
             for(var i in valuesList) {
-                var thisRow = Ti.UI.createTableViewRow({backgroundColor:'#fff'});
-                thisRow.title = valuesList[i];
-                thisRow.value = i;
+                if(valuesList.hasOwnProperty(i)){
+                    var thisRow = Ti.UI.createTableViewRow({backgroundColor:'#fff'});
+                    thisRow.title = valuesList[i];
+                    thisRow.value = i;
 
-                // check the currently selected export format
-                if(row.value == thisRow.value) thisRow.hasCheck = true;
-                data.push(thisRow);
+                    // check the currently selected export format
+                    if(row.value == thisRow.value) { thisRow.hasCheck = true; }
+                    data.push(thisRow);
+                }
             }
             thisTable.setData(data);
 
@@ -211,7 +174,7 @@ function addExportRow(label,property,valuesList,initialValue)
 
 function addAboutRow(label,value)
 {
-    if(label == null) label = 'About';
+    if(label == null) { label = 'About'; }
         
 	var row = Ti.UI.createTableViewRow({height:50});
     row.backgroundColor = '#fff';
@@ -265,6 +228,86 @@ function addAboutRow(label,value)
 	return row;
 }
 
+function addInfoRow(label,property)
+{
+	var row = Ti.UI.createTableViewRow({height:50});
+    row.backgroundColor = '#fff';
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:16,fontWeight:'bold'},
+        left:10
+    });
+    row.add(cellLabel);
+
+    // enable the property to be omitted
+    // TODO: use a type variable to create different styles of controls?
+    if(property != null){
+        row.hasChild = false;
+        row.value = property.toString(); 
+
+        var cellValue = Ti.UI.createLabel({
+            text:row.value,
+            font:{fontSize:14},
+            textAlign:'right',
+            right:20
+        });
+        row.add(cellValue);
+    }
+
+  	row.className = 'info';
+	return row;
+
+}
+
+// set up the settings table rows:
+var inputData = [];
+
+var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
+//networkRow.header = 'Network';
+networkRow.footer = 'Send data to the Mobile Logger server';
+inputData.push(networkRow);
+//inputData.push(addControlRow('Server'));
+//inputData.push(addControlRow('Database'));
+
+var resumeRow = addControlRow('Auto-Resume Logging','autoResume',false);
+//resumeRow.header = 'Configuration';
+resumeRow.header = '';
+inputData.push(resumeRow);
+inputData.push(addControlRow('Metric Units','useMetric'));
+inputData.push(addControlRow('Monitor Sound Levels','monitorSound',true));
+
+// should this actually modify the stored data in the db,
+// or control whether or not the user ID field is included
+// in uploaded or exported data?
+var anonRow = addControlRow('Anonymous Export','omitDeviceID',false);
+anonRow.header = '';
+inputData.push(anonRow);
+
+// trying to get the export to work
+var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah'},'csv');
+inputData.push(exportRow);
+
+// Set up an about message
+var aboutString = 
+'Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance. '+
+'Export logs via e-mail in CSV, JSON or Golden Cheetah format. Data can be automatically uploaded while logging to: http://mobilelogger.robertcarlsen.net\n\n'+
+'By default, logs contain a unique identifier for this device. It may be omitted by enabling the "Anonymous Export" option.\n\n'+
+'This application has been released as open source software under the GPLv3. '+
+'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+
+'Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.';
+
+inputData.push(addAboutRow('About Mobile Logger',aboutString));
+
+// add a version row:
+var versionRow = addInfoRow("Application Version",Ti.App.version);
+//versionRow.header = '';
+inputData.push(versionRow);
+
+
+// create the settings table view:
 var tableView = Titanium.UI.createTableView({ 
 	data:inputData, 
 	style:Titanium.UI.iPhone.TableViewStyle.GROUPED, 

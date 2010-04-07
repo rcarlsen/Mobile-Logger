@@ -43,17 +43,19 @@ actInd.zIndex = 100; // trying to bring this to the front. not working.
 win.add(actInd);
 
 
-var selectedEvents = new Array();
+var selectedEvents = [];
 
-// add a send action button
-var b = Titanium.UI.createButton();
+/*// add a send action button*/
+//var b = Titanium.UI.createButton();
 
-// use special button icon if on iPhone
-if(Ti.Platform.name == 'iPhone OS'){
-    b.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
-} else {
-    b.title = 'Send';
-}
+//// use special button icon if on iPhone
+//if(Ti.Platform.name == 'iPhone OS'){
+    ////b.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
+    //b.backgroundImage = '../images/send_btn.png';
+    //b.backgroundDisabledImage = '../images/send_btn_disabled.png';
+//} else {
+    //b.title = 'Send';
+//}
 
 var isExporting = false;
 
@@ -63,10 +65,10 @@ function sendLog(params){
     var eventID = params.eventID;
 
     // format: [json, csv, gc]
-    if(format == null) format = Ti.App.Properties.getString('exportFormat','csv');
-    if(eventID == null) eventID = false;
+    if(format == null) { format = Ti.App.Properties.getString('exportFormat','csv'); }
+    if(eventID == null) { eventID = false; }
 
-    if(isExporting) return; // don't try sending again if we're already sending
+    if(isExporting) { return; } // don't try sending again if we're already sending
     // TODO: invoke an action sheet with options for sending the data
     // at the moment, just back to emailing off an attachment
 
@@ -124,7 +126,7 @@ function sendLog(params){
     var logid = rows.fieldByName('logid');
 
     // also want to insert the event and device id into the exported data:
-    var eventID = rows.fieldByName('eventid');
+    var selectedEventID = rows.fieldByName('eventid');
     var deviceID = rows.fieldByName('deviceid');
     var startDate =  rows.fieldByName('startdate');
 
@@ -145,15 +147,15 @@ function sendLog(params){
 
     // TODO: group the rows by eventID
     var tmpData=[];
-    while(1){
+    while(rows.isValidRow()){
         var thisData = JSON.parse(rows.fieldByName('DATA'));
         
         // insert the extra fields:
-        thisData.eventID = eventID;
+        thisData.eventID = selectedEventID;
         thisData.deviceID = deviceID;
 
         tmpData.push(thisData);
-        if(rows.next() == false) break;
+        rows.next();
     };
     rows.close();
     logDB.close();
@@ -178,6 +180,9 @@ function sendLog(params){
             tmpDataString = exportCSV(tmpData);
             break;
         case 'json': 
+            // much more robust approach to create a json string
+            tmpDataString = JSON.stringify(tmpData);
+            break;
         default:
             // much more robust approach to create a json string
             tmpDataString = JSON.stringify(tmpData);
@@ -239,9 +244,10 @@ function sendLog(params){
         {
             var alertDialog = Titanium.UI.createAlertDialog({
                 title: 'Problem',
-                message: 'There was a problem. Check your network connection. DEBUG: '+e.result,
+                message: 'There was a problem. Check your network connection.', // DEBUG: '+e.result,
                 buttonNames: ['OK']
             });
+            alertDialog.show();
         }
     });
     emailView.open();
@@ -419,7 +425,7 @@ logTable.addEventListener('delete',function(e)
 
 function deleteEvent(eventID,closeWindow) {
     if(eventID == null) { return; }
-    if(closeWindow == null) closeWindow = false;
+    if(closeWindow == null) { closeWindow = false; }
 
     // Don't delete a currently recoring log
     if(eventID == Ti.App.Properties.getString('eventid','')) {
@@ -432,19 +438,19 @@ function deleteEvent(eventID,closeWindow) {
         alertDialog.show();
         
         // refresh the list if we're in the log list view
-        if(!Ti.UI.currentWindow.isDetailWindow) loadLogs();
+        if(!Ti.UI.currentWindow.isDetailWindow) { loadLogs(); }
         return;
     }
 
 
     // remove the log data from the db
     // but first confirm with an alert
-    var alertDialog = Ti.UI.createAlertDialog({
+    var alertDialogDelete = Ti.UI.createAlertDialog({
         title:'Delete Log',
         message:'Are you sure you want to delete this log data?',
         buttonNames: ['OK','Cancel']
     });
-    alertDialog.addEventListener('click',function(e) {
+    alertDialogDelete.addEventListener('click',function(e) {
         if(e.index == 0){
             // the OK button was clicked, delete this data.
             // open the DB
@@ -477,14 +483,14 @@ function deleteEvent(eventID,closeWindow) {
         loadLogs();
     });
 
-    alertDialog.show();
+    alertDialogDelete.show();
 
 };
 
 
 // simple padding function
 function pad2(number) {
-     return (number < 10 ? '0' : '') + number   
+     return (number < 10 ? '0' : '') + number;
 }
 
 
@@ -492,7 +498,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 {
     Ti.API.info('In the addLogRow() method');
     
-    if(rowData == null) return null;
+    if(rowData == null) { return null; }
 
 	var row = Ti.UI.createTableViewRow({height:55});
     Ti.API.info('Created a new row object');
@@ -574,7 +580,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 	row.className = 'logrow';
 
     row.addEventListener('click',function(e){
-        if(detailPageCount>=1) return;
+        if(detailPageCount>=1) { return; }
         detailPageCount++;
 
 //        row.touchEnabled = false;
@@ -602,13 +608,20 @@ function displayDetail(rowData) {
     newwin.isDetailWindow = true;
 
     // still trying to eliminate the double detail page
-    newwin.addEventListener('close',function(){detailPageCount--});
+    newwin.addEventListener('close',function(){ detailPageCount--; });
             
     // add a send action button
     var sendButton = Titanium.UI.createButton();
     // use special button icon if on iPhone
     if(Ti.Platform.name == 'iPhone OS'){
-        sendButton.systemButton = Titanium.UI.iPhone.SystemButton.ACTION;    
+        //sendButton.systemButton =Titanium.UI.iPhone.SystemButton.ACTION;    
+        sendButton.width = 43;
+        sendButton.height = 30;
+        sendButton.backgroundImage = '../images/up_btn.png';
+        sendButton.backgroundDisabledImage = '../images/up_btn_disabled.png';
+        sendButton.backgroundSelectedImage = '../images/up_btn_selected.png';
+        //sendButton.selectedColor = '#000';
+        //sendButton.title = 'Send';
         newwin.rightNavButton = sendButton;
     } else {
         sendButton.title = 'Send';
@@ -664,7 +677,9 @@ function displayDetail(rowData) {
     // now parse that data
     var dataset = []; 
     for(var d in tmpdataset){
-        dataset.push(JSON.parse(tmpdataset[d]));
+        if(tmpdataset.hasOwnProperty(d)){
+            dataset.push(JSON.parse(tmpdataset[d]));
+        }
     }
     Ti.API.info('Parsed dataset has count: '+dataset.length);
 
@@ -754,7 +769,7 @@ function loadLogs () {
     //Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
     
     // TODO: group the rows by eventID
-    var tmpData = new Array();
+    var tmpData = [];
     var previousSelection = selectedEvents.slice(0);
     selectedEvents.splice(0,selectedEvents.length); // clear the list
 
@@ -931,9 +946,10 @@ function addMapRow (logData) {
         // make a speed note
         var speedString;
         if(Ti.App.Properties.getBool('useMetric',false)) {
-            speedString = toKPH(d.speed).toFixed(2) +' KPH';
+            // using Math.max() to filter out the -1 values from bad speed readings
+            speedString = toKPH(Math.max(0,d.speed)).toFixed(2) +' KPH';
         }else{
-            speedString = toMPH(d.speed).toFixed(2) + ' MPH';
+            speedString = toMPH(Math.max(0,d.speed)).toFixed(2) + ' MPH';
         }
         var point = Ti.Map.createAnnotation({
             latitude:d.lat,
@@ -979,7 +995,7 @@ function addMapRow (logData) {
         p2 = p1;
         
         // if p2 is still null then neither point was valid
-        if(p2.lon == null || p2.lat == null) setRegion = false;
+        if(p2.lon == null || p2.lat == null) { setRegion = false; }
     }
     
 //    p1.lat = (p1.lat == null) ? 0 : p1.lat;
@@ -1053,8 +1069,8 @@ function addMapRow (logData) {
 
 function addSummaryRow (label,value) {
     // have some logic for dealing with empty values?
-    if(label == null) label = 'Summary';
-    if(value == null) value = '';
+    if(label == null) { label = 'Summary'; }
+    if(value == null) { value = ''; }
 
     var row = Ti.UI.createTableViewRow({height:50});
     row.backgroundColor = '#fff';

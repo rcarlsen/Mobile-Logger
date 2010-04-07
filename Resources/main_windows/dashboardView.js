@@ -28,60 +28,6 @@ Ti.include('api.js');
 // reference the parent window
 var win = Ti.UI.currentWindow;
 
-// set up a listener to act every time the window is loaded
-win.addEventListener('focus',function() {
-    //Ti.API.info('Dashboard focus event');
-    setUnits();
-
-    // set the audio monitoring state
-    // iPhone only?
-    if(Ti.Platform.name == 'iPhone OS') {
-        setAudioMonitoring();
-    }
-});
-
-win.addEventListener('open',function() {
-    // is this the first event to trigger?
-    // if not, the setup needs to happen first.
-    // maybe in app.js.
-    //Ti.API.info('In the window open event. About to setup DB.');
-    setupDatabase();
-    
-    // check to see if the the event was open when the app quit
-    var thisEventID = Ti.App.Properties.getString('eventid','');
-    if(thisEventID != '') {
-        if(Ti.App.Properties.getBool('autoResume',false) === false){
-            var alertDialog = Ti.UI.createAlertDialog({
-                title:'Restore Log',
-                message:'A log may have been interrupted. Would you like to continue logging?',
-                buttonNames:['OK','Cancel']
-            });
-            alertDialog.addEventListener('click',function(e){
-                switch(e.index) {
-                    case 0:
-                        // continue log
-                        startLogging(thisEventID);
-                        loggingSwitch.value = true;
-                        break;
-                    case 1:
-                        // do nothing, just remove the eventID
-                        Ti.App.Properties.setString('eventid','');
-                        break;
-                    default:
-                        // do nothing, just remove the eventID
-                        Ti.App.Properties.setString('eventid','');
-                }
-            });
-
-            alertDialog.show();
-        } else {
-            // continue log
-            startLogging(thisEventID);
-            loggingSwitch.value = true;
-        }
-    }
-});
-
 function setLoggingState(state) {
     // set the preferences
     // the application should *always* have the loggingState false
@@ -106,7 +52,7 @@ win.addEventListener('dblclick',function(e){
 // set up some instance vars:
 var loggingState = false; // toggle this when recording
 
-var currentSample = new Object();
+var currentSample = {};
 var eventID;
 var logID;
 //var logDB;
@@ -286,8 +232,7 @@ var compassView = Ti.UI.createView({
 var compass = Ti.UI.createImageView({
     url: '../images/small-compass-shadow.png',
     width:200,height:200,
-    top:0,
-    //center:{x:160,y:0} // this should be relative to the parent view. i think that x and y are transposed
+    top:0
 });
 
 //compassView.borderWidth = 1;
@@ -412,7 +357,7 @@ audioLevelImage.add(audioLevelLabel);
 
 
 function resetValues (restore) {
-    if(restore == null) restore = false;
+    if(restore == null) { restore = false; }
     Ti.API.info('In the resetValues() method');
 
     // if restore is true, then get the last data from the db? 
@@ -439,43 +384,55 @@ function resetValues (restore) {
         Ti.API.info('Inserted the new event into the DB.');
 
         // get the newly created id field
-        var rows = logDB.execute('SELECT logid from LOGMETA WHERE eventid = ?',eventID);
+        var rowsLogid = logDB.execute('SELECT logid from LOGMETA WHERE eventid = ?',eventID);
         Ti.API.info('Queried LOGMETA for logid of eventid: '+eventID);
 
-        if(rows.isValidRow()){ // should only return one row
-            logID = rows.fieldByName('logid');
+        if(rowsLogid.isValidRow()){ // should only return one row
+            logID = rowsLogid.fieldByName('logid');
             Ti.API.info('logID: '+logID);
         
         } else {
             alert('There was a problem creating a new event log.');
             // this is mostly for debugging
-            rows.close();
+            rowsLogid.close();
             return false; // tell the calling method (startLogging) to *not* start
         }
-        rows.close();
+        rowsLogid.close();
         Ti.API.info('Closed the ResultSet');
     } else {
         Ti.API.info('Retrieving the past event');
 
         // retrieve the last event and continue logging.
-        var rows = logDB.execute('SELECT logid,eventid,startdate,duration,distance FROM LOGMETA ORDER BY startdate DESC LIMIT 1');
+        var rowsPrevious = logDB.execute('SELECT logid,eventid,startdate,duration,distance FROM LOGMETA ORDER BY startdate DESC LIMIT 1');
         Ti.API.info('Queried the DB for the most recent event');
+        Ti.API.info('rowsPrevious count: ' + rowsPrevious.rowCount);
 
-        if(rows.isValidRow()){
-            eventDistance = rows.fieldByName('distance');
-            eventStartDate = new Date(rows.fieldByName('startdate')*1000);
-            eventDuration = rows.fieldByName('duration');
-            eventID = rows.fieldByName('eventid');
-            logID = rows.fieldByName('id');
-            
+        if(rowsPrevious.isValidRow()){
+            Ti.API.info('Getting previous event data.');
+
+            eventDistance = rowsPrevious.fieldByName('distance');
+            Ti.API.info('got distance: ' +eventDistance);
+
+            eventStartDate = new Date(rowsPrevious.fieldByName('startdate')*1000);
+            Ti.API.info('got startDate: '+ eventStartDate.toLocaleString());
+
+            eventDuration = rowsPrevious.fieldByName('duration');
+            Ti.API.info('got duration: ' +eventDuration);
+
+            eventID = rowsPrevious.fieldByName('eventid');
+            Ti.API.info('got eventID: '+eventID);
+
+            logID = rowsPrevious.fieldByName('logid');
+            Ti.API.info('got logid: ' +logID);
+
             Ti.API.info('Got last event with eventid: '+eventID+', and startdate: '+eventStartDate);
         } else {
             alert('There was a problem retrieving the previous event');
-            rows.close();
+            rowsPrevious.close();
             return false;
             // TODO: need to have a way to determine if there are any events stored.
         }
-        rows.close();
+        rowsPrevious.close();
         Ti.API.info('Closed the resultSet');
     }
     logDB.close();
@@ -483,72 +440,6 @@ function resetValues (restore) {
 
    return true; 
 }
-
-
-// logging methods
-function startLogging(restore) {
-    if(restore == null) restore = false; // start a new log
-
-    Ti.API.info("Inside the startLogging() method");
-    Ti.API.info('Continue (restore) old log: '+restore);
-
-    // (re)set variables for this new event
-    // if something went wrong get out of here, don't start to logging timers
-    if(!resetValues(restore)) return false;
-    Ti.API.info('Returned from resetValues()');
-
-    currentSample = new Object();
-    currentSample.logID = logID;
-
-    // store this eventid in the app properties
-    Ti.App.Properties.setString('eventid',eventID);
-    loggingState = true;
-    
-    // grab the current position and fill in the currentSample
-    if (Titanium.Geolocation.locationServicesEnabled==true) {
-        Ti.Geolocation.getCurrentPosition(function(e){updateLocationData(e);});
-    }
-    // the first few samples don't seem to have location data
-    // does the first recording after the currentSample is cleared 
-    // need to be delayed for a few moments to allow for a fix?
-    loggingInterval = setInterval(recordSample,1000);
-
-    // start a timer for the clock update
-    clockInterval = setInterval(updateClock,1000);
-
-    // disable the idle timer while logging
-    Ti.App.idleTimerDisabled = true;
-
-    Ti.API.info("Finished the startLogging() method");
-
-    return true;
-};
-
-function stopLogging() {
-    Ti.API.info('In the stopLogging method');
-   
-    // store this eventid in the app properties
-    Ti.App.Properties.setString('eventid','');
-    loggingState = false;
-  
-    clearInterval(loggingInterval);
-    loggingInterval = 0;
-
-    clearInterval(clockInterval);
-    clockInterval = 0;
- 
-    // push the final samples to the server
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        try{
-            sendBuffer(uploadBuffer);
-        } catch(err) {
-            Ti.API.info('Error uploading the final buffer');
-        }
-    }
-
-    // re-enable the idle timer:
-    Ti.App.idleTimerDisabled = false;
-};
 
 function recordSample() {
     // get audio levels. will just record -1 if off
@@ -602,7 +493,7 @@ function recordSample() {
 };
 
 function sendBuffer(docBuffer) {
-    if(docBuffer == null || docBuffer.length == 0) return;
+    if(docBuffer == null || docBuffer.length == 0) { return; }
 
     //Ti.API.info('Sending Buffer');
     // send the batch of docIDs in the uploadBuffer
@@ -655,6 +546,74 @@ function sendBuffer(docBuffer) {
 
     //Ti.API.info('Finished upload');
 }
+
+
+// logging methods:
+function startLogging(restore) {
+    if(restore == null) { restore = false; } // start a new log
+
+    Ti.API.info("Inside the startLogging() method");
+    Ti.API.info('Continue (restore) old log: '+restore);
+
+    // (re)set variables for this new event
+    // if something went wrong get out of here, don't start to logging timers
+    if(!resetValues(restore)) { return false; }
+    Ti.API.info('Returned from resetValues()');
+
+    currentSample = {};
+    currentSample.logID = logID;
+
+    // store this eventid in the app properties
+    Ti.App.Properties.setString('eventid',eventID);
+    loggingState = true;
+    
+    // grab the current position and fill in the currentSample
+    if (Titanium.Geolocation.locationServicesEnabled==true) {
+        Ti.Geolocation.getCurrentPosition(function(e){updateLocationData(e);});
+    }
+    // the first few samples don't seem to have location data
+    // does the first recording after the currentSample is cleared 
+    // need to be delayed for a few moments to allow for a fix?
+    loggingInterval = setInterval(recordSample,1000);
+
+    // start a timer for the clock update
+    clockInterval = setInterval(updateClock,1000);
+
+    // disable the idle timer while logging
+    Ti.App.idleTimerDisabled = true;
+
+    Ti.API.info("Finished the startLogging() method");
+
+    return true;
+};
+
+function stopLogging() {
+    Ti.API.info('In the stopLogging method');
+   
+    // store this eventid in the app properties
+    Ti.App.Properties.setString('eventid','');
+    loggingState = false;
+  
+    clearInterval(loggingInterval);
+    loggingInterval = 0;
+
+    clearInterval(clockInterval);
+    clockInterval = 0;
+ 
+    // push the final samples to the server
+    if(Ti.App.Properties.getBool('uploadEnabled',true)){
+        try{
+            sendBuffer(uploadBuffer);
+        } catch(err) {
+            Ti.API.info('Error uploading the final buffer');
+        }
+    }
+
+    // re-enable the idle timer:
+    Ti.App.idleTimerDisabled = false;
+};
+
+
 
 // end logging methods//
 
@@ -736,11 +695,11 @@ loggingSwitch.addEventListener('change',function(e) {
                 if(e.index == 0) {
                     // continue the previous log
                     var result = startLogging(true);
-                    if(result == false) sw.value = false;
+                    if(result == false) { sw.value = false; }
                 } else {
                     // start a new log
                     var result = startLogging(false);
-                    if(result == false) sw.value = false;
+                    if(result == false) { sw.value = false; }
                 }
             });
 
@@ -749,7 +708,7 @@ loggingSwitch.addEventListener('change',function(e) {
             //Ti.API.info('row count <= 0. call startLogging() for a new event');
             var result = startLogging();
             Ti.API.info('Result of startLogging(): '+ result);
-            if(!result) sw.value = false;
+            if(!result) { sw.value = false; }
         }
 
     }
@@ -782,17 +741,17 @@ dashboardView.visible = true;
 Ti.UI.currentWindow.add(dashboardView);
 
 function updateSpeedLabel (speed) {
-    if(speed == null || speed == undefined) speed = 0;
-    if(speedUnitValue == null) speedUnitValue = 0;
+    if(speed == null || speed == undefined) { speed = 0; }
+    if(speedUnitValue == null) { speedUnitValue = 0; }
 
     speedlabel.text = (speedUnitValue * Math.max(0,speed)).toFixed(1); // m/s -> M/hr
 }
 
 function updateHeadingLabel(heading) {
-    if(heading == null) return;
+    if(heading == null) { return; }
     
     // this is needed to append the degree symbol to the heading label
-    headingLabel.text = Math.max(0,parseInt(heading)) + "\u00B0";
+    headingLabel.text = Math.max(0,parseInt(heading,10)) + "\u00B0";
 
     // update the cardinal direction label, too
     var cardinalDir = ['N','NE','E','SE','S','SW','W','NW','N'];
@@ -808,7 +767,7 @@ function updateForceLabel (force) {
 }
 
 function updateLocationLabel (loc) {
-    if(loc.lon == null || loc.lat == null) return;
+    if(loc.lon == null || loc.lat == null) { return; }
 
     // determine if lon is W ( <0) or E ( >0)
     // determine if lat is N ( >0) or S ( <0)
@@ -822,7 +781,7 @@ function updateLocationLabel (loc) {
 
 // simple padding function
 function pad2(number) {
-     return (number < 10 ? '0' : '') + number   
+     return (number < 10 ? '0' : '') + number;
 }
 
 
@@ -902,26 +861,26 @@ function toggleDisplayVisibility (state) {
         reminderLabel.hide();
         win.backgroundColor = '#ccc';
         //dashboardView.show();
-        var a = Titanium.UI.createAnimation({opacity:1.0,duration:300});
-        dashboardView.animate(a);
+        var a1 = Titanium.UI.createAnimation({opacity:1.0,duration:300});
+        dashboardView.animate(a1);
         dashboardView.show();
     } else if (state == false) {
         // add a label to indicate that the display is hidden
-        reminderLabel.show()
+        reminderLabel.show();
         win.backgroundColor = '#000';
         //dashboardView.hide();
-        var a = Titanium.UI.createAnimation({opacity:0,duration:300});
-        a.addEventListener('complete',function(){
+        var a2 = Titanium.UI.createAnimation({opacity:0,duration:300});
+        a2.addEventListener('complete',function(){
             dashboardView.hide();
         });
-        dashboardView.animate(a);
+        dashboardView.animate(a2);
     }
     //Ti.API.info('Finished toggling the dashboard visibility');
 }
 
 
 function updateDistanceLabel (delta) {
-    if(delta == null) delta = 0;
+    if(delta == null) { delta = 0; }
     // expects a ivar with the current distance
     eventDistance += delta;
 
@@ -1032,7 +991,7 @@ function setAudioMonitoring (state) {
 function rotateCompass(degrees) {
     // cloud 1 animation/transform
 	// don't interrupt the current animation
-    if(compass.animating) {return;}
+    if(compass.animating) { return; }
     
     var t = Ti.UI.create2DMatrix();
 	t = t.rotate(360-parseFloat(degrees));
@@ -1266,7 +1225,9 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     // 1g = -9.8m/s2
     if(Ti.Platform.name == 'android'){
         for(var i in acc){
-            acc[i] = acc[i] / -9.8;
+            if(acc.hasOwnProperty(i)) {
+                acc[i] = acc[i] / -9.8;
+            }
         }
         //acc = div(acc,-9.8);
     };
@@ -1309,6 +1270,61 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     // TODO: big movements trigger an immediate recording
     // will this be instantaenous or will a historcal trend need to be recorded?
     // maybe calculate the magnitude of the vector of all three axes.
+});
+
+// Window event listener methods
+// set up a listener to act every time the window is loaded
+win.addEventListener('focus',function() {
+    //Ti.API.info('Dashboard focus event');
+    setUnits();
+
+    // set the audio monitoring state
+    // iPhone only?
+    if(Ti.Platform.name == 'iPhone OS') {
+        setAudioMonitoring();
+    }
+});
+
+win.addEventListener('open',function() {
+    // is this the first event to trigger?
+    // if not, the setup needs to happen first.
+    // maybe in app.js.
+    //Ti.API.info('In the window open event. About to setup DB.');
+    setupDatabase();
+    
+    // check to see if the the event was open when the app quit
+    var thisEventID = Ti.App.Properties.getString('eventid','');
+    if(thisEventID != '') {
+        if(Ti.App.Properties.getBool('autoResume',false) === false){
+            var alertDialog = Ti.UI.createAlertDialog({
+                title:'Restore Log',
+                message:'A log may have been interrupted. Would you like to continue logging?',
+                buttonNames:['OK','Cancel']
+            });
+            alertDialog.addEventListener('click',function(e){
+                switch(e.index) {
+                    case 0:
+                        // continue log
+                        startLogging(thisEventID);
+                        loggingSwitch.value = true;
+                        break;
+                    case 1:
+                        // do nothing, just remove the eventID
+                        Ti.App.Properties.setString('eventid','');
+                        break;
+                    default:
+                        // do nothing, just remove the eventID
+                        Ti.App.Properties.setString('eventid','');
+                }
+            });
+
+            alertDialog.show();
+        } else {
+            // continue log
+            startLogging(thisEventID);
+            loggingSwitch.value = true;
+        }
+    }
 });
 
 

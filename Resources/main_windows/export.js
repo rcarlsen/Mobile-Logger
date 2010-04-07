@@ -54,19 +54,20 @@ function exportCSV (data) {
     for (var i = 0; i < data.length; i++) {
         var thisRow = [];
         for(var datum in data[i]) {
-            // if this 
-            // add this data type to the index
-            var index = headers.indexOf(datum);
-            if(index == -1){
-                headers.push(datum);
-                index = headers.indexOf(datum);
-            }
+            if(data[i].hasOwnProperty(datum)) { 
+                // add this data type to the index
+                var index = headers.indexOf(datum);
+                if(index == -1){
+                    headers.push(datum);
+                    index = headers.indexOf(datum);
+                }
 
-            // respect the user preference to omit the device ID
-            if(datum == 'deviceID' && Ti.App.Properties.getBool('omitDeviceID',false)) {
-                thisRow[index] = -1;
-            } else {
-                thisRow[index] = data[i][datum];
+                // respect the user preference to omit the device ID
+                if(datum == 'deviceID' && Ti.App.Properties.getBool('omitDeviceID',false)) {
+                    thisRow[index] = -1;
+                } else {
+                    thisRow[index] = data[i][datum];
+                }
             }
         };
         // add this row to the output
@@ -103,7 +104,7 @@ function exportGCfile (data) {
 
     Ti.API.info('Inside exportGCfile');
 
-    if(data == null) return;
+    if(data == null) { return; }
 
     // this expects a json array of sample objects
     // it will create the attributes header
@@ -145,25 +146,26 @@ function exportGCfile (data) {
 // timestamp to secs    (cumulative since the start time)
 // distance (km)        (cumulative since the start location. calculate from the coordinates?)
 // len                  (seconds duration between samples - first sample is key and must be set)
-        var thisData = new Object();
+        var thisData = {};
         var prevLoc;
         var prevTimestamp;
 
         for(var datum in data[i]){
-            if(i==0) Ti.API.info('Datum: '+datum);
+            if(data[i].hasOwnProperty(datum)) { 
+                if(i==0) { Ti.API.info('Datum: '+datum); }
 
-            switch(datum) {
-                case 'speed':
-                    thisData.kph = Math.max(0,(data[i][datum] * 3.6).toFixed(4));
-                    break;
-                case 'timestamp':
-                    thisData.secs = ((data[i][datum] - startTime)/1000).toFixed(2); //convert millis to secs
-                    break;
-                default:
-                    thisData[datum] = data[i][datum];
-                    // Ti.API.info('Just added: '+datum+', as: '+thisData[datum]);
+                switch(datum) {
+                    case 'speed':
+                        thisData.kph = Math.max(0,(data[i][datum] * 3.6).toFixed(4));
+                        break;
+                    case 'timestamp':
+                        thisData.secs = ((data[i][datum] - startTime)/1000).toFixed(2); //convert millis to secs
+                        break;
+                    default:
+                        thisData[datum] = data[i][datum];
+                        // Ti.API.info('Just added: '+datum+', as: '+thisData[datum]);
+                }
             }
-
         }
 
         // TODO: running distance should be baked into the data
@@ -173,7 +175,7 @@ function exportGCfile (data) {
                 thisData.km = 0;
             } else {
                 var dist = calculateDistanceDelta(prevLoc,{lon:data[i].lon,lat:data[i].lat})/1000;
-                if(isNaN(dist)) dist = 0; 
+                if(isNaN(dist)) { dist = 0; }
                 rideKM += dist;
                 thisData.km = rideKM.toFixed(5);
             }
@@ -192,7 +194,7 @@ function exportGCfile (data) {
         }
         prevTimestamp = data[i].timestamp;
 
-        if(i==0) Ti.API.info('Processed first sample: '+JSON.stringify(thisData));
+        if(i==0) { Ti.API.info('Processed first sample: '+JSON.stringify(thisData)); }
 
         results.push(element('sample','',thisData));
         //Ti.API.info('Added sample: '+i);

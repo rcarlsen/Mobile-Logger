@@ -85,7 +85,7 @@ function setupDatabase() {
         Ti.API.info('LOGMETA upgrade test. field count: '+ rows.fieldCount());
         rows.close();
       }
-    catch(err)
+    catch(err1)
       {
         // check for error indicating that these columns don't exist
         Ti.API.info('Caught the LOGMETA table test error');
@@ -108,12 +108,12 @@ function setupDatabase() {
     try
       {
         // add the logid table and move the id field over to it
-        var rows = logDB.execute('SELECT logid,_rev FROM LOGDATA LIMIT 1');
-        Ti.API.info('LOGDATA upgrade test. row count: '+ rows.rowCount);
-        Ti.API.info('LOGDATA upgrade test. field count: '+ rows.fieldCount());
-        rows.close();
+        var rowsLogid = logDB.execute('SELECT logid,_rev FROM LOGDATA LIMIT 1');
+        Ti.API.info('LOGDATA upgrade test. row count: '+ rowsLogid.rowCount);
+        Ti.API.info('LOGDATA upgrade test. field count: '+ rowsLogid.fieldCount());
+        rowsLogid.close();
       }
-    catch(err)
+    catch(err2)
       {
         // check for error indicating that these columns don't exist
         Ti.API.info('Caught the LOGDATA table test error');
@@ -139,22 +139,22 @@ function setupDatabase() {
 }
 
 function toMPH (metersPerSec) {
-    if(metersPerSec == null) return 0;
+    if(metersPerSec == null) { return 0; }
     return metersPerSec * 2.236936; // m/s -> M/hr
 }
 
 function toKPH (metersPerSec) {
-    if(metersPerSec == null) return 0;
+    if(metersPerSec == null) { return 0; }
     return metersPerSec * 3.6;
 }
 
 function toMiles (meters) {
-    if(meters == null) return 0;
+    if(meters == null) { return 0; }
     return meters * 0.000621371192;
 }
 
 function toKM (meters) {
-    if(meters == null) return 0;
+    if(meters == null) { return 0; }
     return meters * 0.001;
 }
      
