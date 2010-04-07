@@ -82,7 +82,11 @@ function setupDatabase() {
         // add the logid table and move the id field over to it
         var rows = logDB.execute('SELECT logid,_rev FROM LOGMETA LIMIT 1');
         Ti.API.info('LOGMETA upgrade test. row count: '+ rows.rowCount);
-        Ti.API.info('LOGMETA upgrade test. field count: '+ rows.fieldCount());
+        
+        // this fieldCount() is breaking on android...
+        if(Ti.Platform.name == 'iPhone OS'){
+            Ti.API.info('LOGMETA upgrade test. field count: '+ rows.fieldCount());
+        }
         rows.close();
       }
     catch(err1)
@@ -110,7 +114,10 @@ function setupDatabase() {
         // add the logid table and move the id field over to it
         var rowsLogid = logDB.execute('SELECT logid,_rev FROM LOGDATA LIMIT 1');
         Ti.API.info('LOGDATA upgrade test. row count: '+ rowsLogid.rowCount);
-        Ti.API.info('LOGDATA upgrade test. field count: '+ rowsLogid.fieldCount());
+        // this fieldCount() is breaking on android...
+        if(Ti.Platform.name == 'iPhone OS'){
+            Ti.API.info('LOGDATA upgrade test. field count: '+ rowsLogid.fieldCount());
+        }
         rowsLogid.close();
       }
     catch(err2)

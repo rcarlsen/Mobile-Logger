@@ -413,472 +413,14 @@ logTable.addEventListener('click',function(){});
 //
 //});
 //
-// add delete event listener
-logTable.addEventListener('delete',function(e)
-{
-    // get the selected row's eventID
-    var eventID = e.row.eventID;
-    if (eventID == null ) {return;}
-
-    deleteEvent(eventID);
-});
-
-function deleteEvent(eventID,closeWindow) {
-    if(eventID == null) { return; }
-    if(closeWindow == null) { closeWindow = false; }
-
-    // Don't delete a currently recoring log
-    if(eventID == Ti.App.Properties.getString('eventid','')) {
-        // display and alert and return
-        var alertDialog = Ti.UI.createAlertDialog({
-            title:'Currently Logging',
-            message:'Unable to delete this log while recording.',
-            buttonNames:['OK']
-        });
-        alertDialog.show();
-        
-        // refresh the list if we're in the log list view
-        if(!Ti.UI.currentWindow.isDetailWindow) { loadLogs(); }
-        return;
-    }
 
 
-    // remove the log data from the db
-    // but first confirm with an alert
-    var alertDialogDelete = Ti.UI.createAlertDialog({
-        title:'Delete Log',
-        message:'Are you sure you want to delete this log data?',
-        buttonNames: ['OK','Cancel']
-    });
-    alertDialogDelete.addEventListener('click',function(e) {
-        if(e.index == 0){
-            // the OK button was clicked, delete this data.
-            // open the DB
-            var logDB = Ti.Database.open("log.db");
-
-
-
-            // run the SQL statement to delete the row.
-            var rows = logDB.execute('SELECT logid FROM LOGMETA WHERE eventid = ?',eventID);
-            var logid = rows.fieldByName('logid');
-            rows.close();
-
-            logDB.execute('DELETE FROM LOGDATA WHERE logid = ?',logid);
-            logDB.execute('DELETE FROM LOGMETA WHERE logid = ?',logid);
-            // is there a way to verify the process?
-
-            logDB.close();
-           
-            Ti.API.info('deleted eventID: '+eventID);
-
-            // if we're in the detail page..then have to close the current window
-            Ti.API.info('This is the detail window: '+JSON.stringify(closeWindow));
-            if(closeWindow != false) {
-                Ti.API.info('About the close the detail window since the log was deleted');
-                closeWindow.close();
-            }
-        }
-        // have to refresh the table data
-        Ti.API.info('Reloading log list from alert dialog');
-        loadLogs();
-    });
-
-    alertDialogDelete.show();
-
-};
 
 
 // simple padding function
 function pad2(number) {
      return (number < 10 ? '0' : '') + number;
 }
-
-
-function addLogRow(rowData) // should include title(date), duration, distance, eventID/logID (for detail view) 
-{
-    Ti.API.info('In the addLogRow() method');
-    
-    if(rowData == null) { return null; }
-
-	var row = Ti.UI.createTableViewRow({height:55});
-    Ti.API.info('Created a new row object');
-
-    // add a label to the left
-    // should be bold
-    var cellLabel = Ti.UI.createLabel({
-        text:rowData.title,
-        font:{fontSize:15,fontWeight:'bold'},
-        left:10,top:10,
-        height:'auto'
-    });
-    row.add(cellLabel);
-    Ti.API.info('Created (and added) the title to the row');
-
-    // create a label for the subtitle
-    // duration is millis
-    var hour = Math.floor(rowData.duration / 1000 / 60 / 60);
-    var min = Math.floor(rowData.duration / 1000 / 60) % 60;
-    var sec = Math.floor(rowData.duration / 1000) % 60;
-    var durationString = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
-    Ti.API.info('Created the durationString: '+durationString);
-
-    // distance / average
-    var avgSpeedString;
-    var distanceString; 
-     if(Ti.App.Properties.getBool('useMetric',false)) {
-        Ti.API.info('Metric units');
-        var distanceUnits = "KM";
-        var speedUnits = 'KPH';
-
-        var distanceUnitValue = 0.001; //m -> km
-        var speedUnitValue = 3.6; // m/s -> M/hr
-
-        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
-
-        avgSpeedString = (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
-        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
-    } else {
-        Ti.API.info('Imperial units');
-        var distanceUnits = "Miles";
-        var speedUnits = 'MPH';
-
-        var distanceUnitValue = 0.000621371192; // m -> mile
-        var speedUnitValue = 2.236936; // m/s -> M/hr
-
-        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
-
-        avgSpeedString = (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
-        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
-   }
-   Ti.API.info('Created the distanceString: '+distanceString);
-
-    // combine the two to create the subtitle label
-    // smaller and grey
-    var subtitleLabel = Ti.UI.createLabel({
-        text:durationString +' | '+distanceString,
-        font:{fontSize:13},
-        color:'#666',
-        left:10,top:23
-    });
-    row.add(subtitleLabel);
-    Ti.API.info('Created (and added) the subtitle label to the row');
-
-    // add these strings to the row object for easy retrieval in the detail view
-    row.distanceString = distanceString;
-    row.durationString = durationString;
-    row.avgSpeedString = avgSpeedString;
-
-    // also add data useful for retrieving the log later
-    row.eventID = rowData.eventID;
-    row.logID = rowData.logID;
-    row.name = rowData.title;
-
-    // add the child icon
-    row.hasChild = true;
-    //row.hasCheck = rowData.hasCheck;
-
-	row.className = 'logrow';
-
-    row.addEventListener('click',function(e){
-        if(detailPageCount>=1) { return; }
-        detailPageCount++;
-
-//        row.touchEnabled = false;
-//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
-
-        displayDetail(row);
-
-//        row.touchEnabled = true;
-//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.DEFAULT
-    });
-
-    Ti.API.info('Finished setting up the row. Now returning it');
-    return row;
-}
-
-
-function displayDetail(rowData) { 
-    var newwin = Titanium.UI.createWindow({
-        title:'Log Summary',
-        backgroundColor:'#ccc',
-        barColor:orangeColor
-    });
-
-    // set a custom property to be able to identify this as a detail window
-    newwin.isDetailWindow = true;
-
-    // still trying to eliminate the double detail page
-    newwin.addEventListener('close',function(){ detailPageCount--; });
-            
-    // add a send action button
-    var sendButton = Titanium.UI.createButton();
-    // use special button icon if on iPhone
-    if(Ti.Platform.name == 'iPhone OS'){
-        //sendButton.systemButton =Titanium.UI.iPhone.SystemButton.ACTION;    
-        sendButton.width = 43;
-        sendButton.height = 30;
-        sendButton.backgroundImage = '../images/up_btn.png';
-        sendButton.backgroundDisabledImage = '../images/up_btn_disabled.png';
-        sendButton.backgroundSelectedImage = '../images/up_btn_selected.png';
-        //sendButton.selectedColor = '#000';
-        //sendButton.title = 'Send';
-        newwin.rightNavButton = sendButton;
-    } else {
-        sendButton.title = 'Send';
-        // TODO: figure out a solution for android
-        // Menu?
-    }
-    //TODO: should this display the options dialog?
-    sendButton.addEventListener('click',function(){
-        Ti.API.info('Send button pressed. isExporting == '+isExporting);
-        
-        // temporarily disable the button to prevent a double-tap
-        sendButton.enabled = false;
-        sendButton.touchEnabled = false;
-
-        sendLog({eventID:rowData.eventID});
-
-        setTimeout(function() {
-            sendButton.enabled = true;
-            sendButton.touchEnabled = true;
-        },1000);
-    });
-
-    // This is where we have to query the database and calculate and metrics needed
-    // TODO: *very* close to having to extract the log data into columns
-    var logDB = Ti.Database.open('log.db');
-
-    // get the first item
-    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID ASC LIMIT 1',rowData.logID);    
-    var firstSample = JSON.parse(rows.fieldByName('DATA'));
-    rows.close();
-    // get the last item
-    rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID DESC LIMIT 1',rowData.logID);    
-    var lastSample = JSON.parse(rows.fieldByName('DATA'));
-    rows.close();
-
-    // get every nth item
-    // assuming sequential ROWISs
-    rows = logDB.execute('SELECT * FROM LOGDATA WHERE (logid = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',rowData.logID);
-    var tmpdataset = [];
-    while(rows.isValidRow()){
-        tmpdataset.push(rows.fieldByName('DATA'));
-        rows.next();
-    }
-    Ti.API.info('Got remaining data points, count: '+tmpdataset.length);
-
-    rows.close();
-    logDB.close();
-    Ti.API.info('Got the first and last items from the current log');
-
-    Ti.API.info('First sample: '+ JSON.stringify(firstSample));
-    Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
-
-    // now parse that data
-    var dataset = []; 
-    for(var d in tmpdataset){
-        if(tmpdataset.hasOwnProperty(d)){
-            dataset.push(JSON.parse(tmpdataset[d]));
-        }
-    }
-    Ti.API.info('Parsed dataset has count: '+dataset.length);
-
-    // construct the table view with the groupings here.
-    var summaryTable = Ti.UI.createTableView({
-        backgroundColor:'#ccc',
-        headerTitle:rowData.name,
-        style:Titanium.UI.iPhone.TableViewStyle.GROUPED
-    });
-
-    // create the data for the table
-    var summaryData = [];
-    var mapRow = addMapRow({first:firstSample,last:lastSample,data:dataset}); // TODO: figure a better data delivery method
-
-    //mapRow.header = rowData.title;
-    summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
-   
-    //var metricsSection = Titanium.UI.createTableViewSection();
-    //metricsSection.headerTitle = "Metrics";
-
-    var firstRow = addSummaryRow('Duration',rowData.durationString);
-    firstRow.header = "Metrics";
-    summaryData.push(firstRow);
-  
-    // TODO: how to change this if the distance units are changed?
-    summaryData.push(addSummaryRow('Distance',rowData.distanceString));
-    summaryData.push(addSummaryRow('Average speed',rowData.avgSpeedString));
-    //summaryData.push(addSummaryRow('Altitude gain','xx'));
-    //summaryData.push(addSummaryRow('Average loudness','xx'));
-    //summaryData.push(addSummaryRow('Bumpiness factor','xx'));
-
-    // add the delete log button
-    // TODO: make this a big red button, and link to the delete logic
-    // including the alert view prompts
-    var deleteButton = Titanium.UI.createButton({
-        title:'Delete Log',
-        font:{fontSize:20,fontWeight:'bold'},
-        height:45,
-        width:300,
-        backgroundImage:'../images/button_red-150x45.png',
-        borderRadius:10
-    });
-    deleteButton.addEventListener('click',function() {
-        Ti.API.info('Delete button (detail view) clicked for eventID: '+rowData.eventID);
-        deleteEvent(rowData.eventID,newwin); // second arg to close the current window
-        //Ti.API.info('Event should have been deleted');
-    });
-
-    var deleteRow = Ti.UI.createTableViewRow();
-    deleteRow.header = ''; // nieve way to add a new section to the table
-    deleteRow.add(deleteButton);
-    summaryData.push(deleteRow);
-
-    summaryTable.setData(summaryData);
-    Ti.API.info('Created summaryTable and added summary data rows');
-    
-    newwin.add(summaryTable);
-
-    Titanium.UI.currentTab.open(newwin,{animated:true});
-
-    // reset the flag to allow another detail page to load
-    //setTimeout(function() {isLoadingDetail = false;},1000);
-
-}
-
-
-
-// call up the log list from the database
-function loadLogs () {
-    // display the activity indicator
-    actInd.show();
-    
-    // open the database connection (create if necessary)
-    var logDB = Ti.Database.open("log.db");
-
-    Ti.API.info('Getting logs from db');
-
-
-    // TODO: move the data base stuff into a class.
-    
-    // this should be streated by the setupDatabase() method
-    //logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
-
-    //var rows = logDB.execute('SELECT * FROM LOGDATA GROUP BY EVENTID');
-    var rows = logDB.execute('SELECT * FROM LOGMETA ORDER BY startdate DESC');
-
-    //Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
-    
-    // TODO: group the rows by eventID
-    var tmpData = [];
-    var previousSelection = selectedEvents.slice(0);
-    selectedEvents.splice(0,selectedEvents.length); // clear the list
-
-    if(rows.getRowCount() > 0) {
-        while(rows.isValidRow()){
-            //var thisData = rows.fieldByName('DATA');
-            //var thisObject = JSON.parse(thisData);
-            var thisTimestamp = rows.fieldByName('startdate');
-
-            var rowParams = {   title:new Date(thisTimestamp*1000).toLocaleString(), // only stored as seconds
-                                eventID:rows.fieldByName('eventid'),
-                                content:null,
-                                timestamp:thisTimestamp,
-                                duration:rows.fieldByName('duration'),
-                                distance:rows.fieldByName('distance'),
-                                logID:rows.fieldByName('logid')
-                                };
-
-            /* // notes on creating custom row layouts
-            row = Ti.UI.createTableViewRow();
-            row.hasDetail = true;
-            row.title = rows.field(1);
-            row.leftImage = '../images/film/small/'+rows.fieldByName('small_img');
-            data[rows.field(0)] = row;
-            rows.next();
-            */
-
-            // look up the eventid in the selectedEvents array.
-            if(previousSelection.indexOf(rowParams.eventID) >= 0) {
-                Ti.API.info('Found previously selected event');
-                rowParams.hasCheck = true;
-                selectedEvents.push(rowParams.eventID); // restore this selection
-            } else {
-                Ti.API.info('Found unselected event');
-                //rowParams.hasDetail = true;
-            }
-            tmpData.push(rowParams);
-            rows.next();
-        };
-    }
-    rows.close();
-    logDB.close();
-
-    // generate the custom rows, and push them to the data:
-    for (var i = 0; i < tmpData.length; i++) {
-        tmpData[i] = addLogRow(tmpData[i]);
-    };
-
-    // sort chronolocically:
-    //tmpData.sort(compareTime);
-
-    Ti.API.info('Got '+tmpData.length+' events');
-    Ti.API.info('Selected events: '+selectedEvents);
-
-    if(tmpData.length == 0) { 
-        tmpData.push({title:'No Logs recorded.',touchEnabled:false});
-    } else {
-        logTable.editable=true;
-    }
-
-    // this seems to only be available on iPhone.
-    if(Ti.Platform.name == "iPhone OS"){
-        Ti.API.info('Updating the iPhone log table');
-        logTable.setData(tmpData);
-    } else {
-        // hack for android
-        Ti.API.info('Updating the Android log table');
-        win.remove(logTable);
-        logTable.data = tmpData;
-        win.add(logTable);
-    }
-
-    // hide the activity indicator
-    actInd.hide();
-}
-
-// reload the logs when the window gains focus
-win.addEventListener('focus',function() {
-    loadLogs();
-    //selectedEvents = [];
-});
-
-// ensure that the db has been created
-// will this be a problem if logging is happening?
-win.addEventListener('open',function() { 
-    // if logging is already occurring, we can assume that the db has been created
-    // trying to avoid a db conflict
-    // otherwise, set up the db once.
-    if(Ti.App.Properties.getString('eventid','') == ''){
-        setupDatabase(); 
-    }
-});
-
-// the android doesn't seem to be responding to focus or open events
-// TODO: fix me please
-if(Ti.Platform.name == 'android') {
-    loadLogs();
-    //selectedEvents = [];
-}
-
-
-function compareTime(a, b) {
-    return b.timestamp - a.timestamp;
-}
-
-
-// add the log table to the view.
-win.add(logTable);
-
 
 // Methods for the log detail view
 // set up in a grouped table view.
@@ -1102,6 +644,511 @@ function addSummaryRow (label,value) {
     Ti.API.info('Returning a summary row for: '+label);
     return row;
 }
+
+
+function deleteEvent(params) {
+    // use parameters
+    //{eventID,closeWindow,confirm}
+    var eventID = params.eventid;
+    var closeWindow = params.closeWindow;
+    var confirmDelete = params.confirmDelete;
+
+    if(eventID == null) { return; }
+    if(closeWindow == null) { closeWindow = false; }
+    if(confirmDelete == null) {confirmDelete = true; }
+
+    // Don't delete a currently recoring log
+    if(eventID == Ti.App.Properties.getString('eventid','')) {
+        // display and alert and return
+        var alertDialog = Ti.UI.createAlertDialog({
+            title:'Currently Logging',
+            message:'Unable to delete this log while recording.',
+            buttonNames:['OK']
+        });
+        alertDialog.show();
+        
+        // refresh the list if we're in the log list view
+        if(!Ti.UI.currentWindow.isDetailWindow) { 
+            // TODO: fix how to refresh the table without callong loadLogs() 
+            //loadLogs(); 
+            
+            
+            // restore log table to the current data
+            if(Ti.Platform.name == 'iPhone OS') {
+                logTable.setData(data,{animationStyle:Titanium.UI.iPhone.RowAnimationStyle.FADE});
+            } else {
+                logTable.setData(data);
+            }
+        }
+        return;
+    }
+
+    function deleteSelectedEvent() {
+        // open the DB
+        var logDB = Ti.Database.open("log.db");
+
+        // run the SQL statement to delete the row.
+        var rows = logDB.execute('SELECT logid FROM LOGMETA WHERE eventid = ?',eventID);
+        var logid = rows.fieldByName('logid');
+        rows.close();
+
+        logDB.execute('DELETE FROM LOGDATA WHERE logid = ?',logid);
+        logDB.execute('DELETE FROM LOGMETA WHERE logid = ?',logid);
+        // is there a way to verify the process?
+
+        logDB.close();
+       
+        Ti.API.info('deleted eventID: '+eventID);
+
+        // if we're in the detail page..then have to close the current window
+        Ti.API.info('This is the detail window: '+JSON.stringify(closeWindow));
+        if(closeWindow != false) {
+            Ti.API.info('About the close the detail window since the log was deleted');
+            closeWindow.close();
+        }
+
+        // trigger a focus event, which will update the logTable data
+        win.fireEvent('focus');
+
+    }
+
+
+    if(confirmDelete) {
+    // remove the log data from the db
+    // but first confirm with an alert
+    var alertDialogDelete = Ti.UI.createAlertDialog({
+        title:'Delete Log',
+        message:'Are you sure you want to delete this log data?',
+        buttonNames: ['OK','Cancel']
+    });
+    alertDialogDelete.addEventListener('click',function(e) {
+        if(e.index == 0){
+            // the OK button was clicked, delete this data.
+            deleteSelectedEvent();
+        }
+        
+        // deleting in the detail window will cause the logtable view to 
+        // gain focus after the delete (and thus loadLogs will get called)
+        // so, we don't need to force a refresh here.
+        //
+        // have to refresh the table data...is there another way?
+        //Ti.API.info('Reloading log list from alert dialog');
+        //loadLogs();
+        
+        // restore log table to the current data
+        //logTable.setData(data,{animationStyle:Titanium.UI.iPhone.RowAnimationStyle.UP});
+    });
+
+    alertDialogDelete.show();
+
+    } else {
+        // just do it
+        deleteSelectedEvent();
+    }
+};
+
+
+function displayDetail(rowData) { 
+    var newwin = Titanium.UI.createWindow({
+        title:'Log Summary',
+        backgroundColor:'#ccc',
+        barColor:orangeColor
+    });
+
+    // set a custom property to be able to identify this as a detail window
+    newwin.isDetailWindow = true;
+
+    // still trying to eliminate the double detail page
+    newwin.addEventListener('close',function(){ detailPageCount--; });
+            
+    // add a send action button
+    var sendButton = Titanium.UI.createButton();
+    // use special button icon if on iPhone
+    if(Ti.Platform.name == 'iPhone OS'){
+        //sendButton.systemButton =Titanium.UI.iPhone.SystemButton.ACTION;    
+        sendButton.width = 43;
+        sendButton.height = 30;
+        sendButton.backgroundImage = '../images/up_btn.png';
+        sendButton.backgroundDisabledImage = '../images/up_btn_disabled.png';
+        sendButton.backgroundSelectedImage = '../images/up_btn_selected.png';
+        //sendButton.selectedColor = '#000';
+        //sendButton.title = 'Send';
+        newwin.rightNavButton = sendButton;
+    } else {
+        sendButton.title = 'Send';
+        // TODO: figure out a solution for android
+        // Menu?
+    }
+    //TODO: should this display the options dialog?
+    sendButton.addEventListener('click',function(){
+        Ti.API.info('Send button pressed. isExporting == '+isExporting);
+        
+        // temporarily disable the button to prevent a double-tap
+        sendButton.enabled = false;
+        sendButton.touchEnabled = false;
+
+        sendLog({eventID:rowData.eventID});
+
+        setTimeout(function() {
+            sendButton.enabled = true;
+            sendButton.touchEnabled = true;
+        },1000);
+    });
+
+    // This is where we have to query the database and calculate and metrics needed
+    // TODO: *very* close to having to extract the log data into columns
+    var logDB = Ti.Database.open('log.db');
+
+    // get the first item
+    var rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID ASC LIMIT 1',rowData.logID);    
+    var firstSample = JSON.parse(rows.fieldByName('DATA'));
+    rows.close();
+    // get the last item
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE logid = ? ORDER BY ROWID DESC LIMIT 1',rowData.logID);    
+    var lastSample = JSON.parse(rows.fieldByName('DATA'));
+    rows.close();
+
+    // get every nth item
+    // assuming sequential ROWISs
+    rows = logDB.execute('SELECT * FROM LOGDATA WHERE (logid = ? AND (ROWID % 10) = 0) LIMIT -1 OFFSET 1',rowData.logID);
+    var tmpdataset = [];
+    while(rows.isValidRow()){
+        tmpdataset.push(rows.fieldByName('DATA'));
+        rows.next();
+    }
+    Ti.API.info('Got remaining data points, count: '+tmpdataset.length);
+
+    rows.close();
+    logDB.close();
+    Ti.API.info('Got the first and last items from the current log');
+
+    Ti.API.info('First sample: '+ JSON.stringify(firstSample));
+    Ti.API.info('Last sample: '+ JSON.stringify(lastSample));
+
+    // now parse that data
+    var dataset = []; 
+    for(var d in tmpdataset){
+        if(tmpdataset.hasOwnProperty(d)){
+            dataset.push(JSON.parse(tmpdataset[d]));
+        }
+    }
+    Ti.API.info('Parsed dataset has count: '+dataset.length);
+
+    // construct the table view with the groupings here.
+    var summaryTable = Ti.UI.createTableView({
+        backgroundColor:'#ccc',
+        headerTitle:rowData.name,
+        style:Titanium.UI.iPhone.TableViewStyle.GROUPED
+    });
+
+    // create the data for the table
+    var summaryData = [];
+    var mapRow = addMapRow({first:firstSample,last:lastSample,data:dataset}); // TODO: figure a better data delivery method
+
+    //mapRow.header = rowData.title;
+    summaryData.push(mapRow); //TODO: pass something which can be used to get the ride location
+   
+    //var metricsSection = Titanium.UI.createTableViewSection();
+    //metricsSection.headerTitle = "Metrics";
+
+    var firstRow = addSummaryRow('Duration',rowData.durationString);
+    firstRow.header = "Metrics";
+    summaryData.push(firstRow);
+  
+    // TODO: how to change this if the distance units are changed?
+    summaryData.push(addSummaryRow('Distance',rowData.distanceString));
+    summaryData.push(addSummaryRow('Average speed',rowData.avgSpeedString));
+    //summaryData.push(addSummaryRow('Altitude gain','xx'));
+    //summaryData.push(addSummaryRow('Average loudness','xx'));
+    //summaryData.push(addSummaryRow('Bumpiness factor','xx'));
+
+    // add the delete log button
+    // TODO: make this a big red button, and link to the delete logic
+    // including the alert view prompts
+    var deleteButton = Titanium.UI.createButton({
+        title:'Delete Log',
+        font:{fontSize:20,fontWeight:'bold'},
+        height:45,
+        width:300,
+        backgroundImage:'../images/button_red-150x45.png',
+        borderRadius:10
+    });
+    deleteButton.addEventListener('click',function() {
+        Ti.API.info('Delete button (detail view) clicked for eventID: '+rowData.eventID);
+        deleteEvent({eventid:rowData.eventID,closeWindow:newwin}); // second arg to close the current window
+        //Ti.API.info('Event should have been deleted');
+    });
+
+    var deleteRow = Ti.UI.createTableViewRow();
+    deleteRow.header = ''; // nieve way to add a new section to the table
+    deleteRow.add(deleteButton);
+    summaryData.push(deleteRow);
+
+    summaryTable.setData(summaryData);
+    Ti.API.info('Created summaryTable and added summary data rows');
+    
+    newwin.add(summaryTable);
+
+    Titanium.UI.currentTab.open(newwin,{animated:true});
+
+    // reset the flag to allow another detail page to load
+    //setTimeout(function() {isLoadingDetail = false;},1000);
+
+}
+
+function addLogRow(rowData) // should include title(date), duration, distance, eventID/logID (for detail view) 
+{
+    Ti.API.info('In the addLogRow() method');
+    
+    if(rowData == null) { return null; }
+
+	var row = Ti.UI.createTableViewRow({height:55});
+    Ti.API.info('Created a new row object');
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:rowData.title,
+        font:{fontSize:15,fontWeight:'bold'},
+        left:10,top:10,
+        height:'auto'
+    });
+    row.add(cellLabel);
+    Ti.API.info('Created (and added) the title to the row');
+
+    // create a label for the subtitle
+    // duration is millis
+    var hour = Math.floor(rowData.duration / 1000 / 60 / 60);
+    var min = Math.floor(rowData.duration / 1000 / 60) % 60;
+    var sec = Math.floor(rowData.duration / 1000) % 60;
+    var durationString = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
+    Ti.API.info('Created the durationString: '+durationString);
+
+    // distance / average
+    var avgSpeedString;
+    var distanceString; 
+     if(Ti.App.Properties.getBool('useMetric',false)) {
+        Ti.API.info('Metric units');
+        var distanceUnits = "KM";
+        var speedUnits = 'KPH';
+
+        var distanceUnitValue = 0.001; //m -> km
+        var speedUnitValue = 3.6; // m/s -> M/hr
+
+        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
+
+        // don't divide by zero.
+        avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
+        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
+    } else {
+        Ti.API.info('Imperial units');
+        var distanceUnitsImperial = "Miles";
+        var speedUnitsImperial = 'MPH';
+
+        var distanceUnitValueImperial = 0.000621371192; // m -> mile
+        var speedUnitValueImperial = 2.236936; // m/s -> M/hr
+
+        distanceString = (rowData.distance * distanceUnitValueImperial).toFixed(2) +' '+distanceUnitsImperial;
+
+        avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValueImperial;
+        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnitsImperial;
+   }
+   Ti.API.info('Created the distanceString: '+distanceString);
+
+    // combine the two to create the subtitle label
+    // smaller and grey
+    var subtitleLabel = Ti.UI.createLabel({
+        text:durationString +' | '+distanceString,
+        font:{fontSize:13},
+        color:'#666',
+        left:10,top:23
+    });
+    row.add(subtitleLabel);
+    Ti.API.info('Created (and added) the subtitle label to the row');
+
+    // add these strings to the row object for easy retrieval in the detail view
+    row.distanceString = distanceString;
+    row.durationString = durationString;
+    row.avgSpeedString = avgSpeedString;
+
+    // also add data useful for retrieving the log later
+    row.eventID = rowData.eventID;
+    row.logID = rowData.logID;
+    row.name = rowData.title;
+
+    // add the child icon
+    row.hasChild = true;
+    //row.hasCheck = rowData.hasCheck;
+
+	row.className = 'logrow';
+
+    row.addEventListener('click',function(e){
+        if(detailPageCount>=1) { return; }
+        detailPageCount++;
+
+//        row.touchEnabled = false;
+//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
+
+        displayDetail(row);
+
+//        row.touchEnabled = true;
+//        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.DEFAULT
+    });
+
+    Ti.API.info('Finished setting up the row. Now returning it');
+    return row;
+}
+
+
+
+// call up the log list from the database
+function loadLogs () {
+    // display the activity indicator
+    actInd.show();
+    
+    // open the database connection (create if necessary)
+    var logDB = Ti.Database.open("log.db");
+
+    Ti.API.info('Getting logs from db');
+
+
+    // TODO: move the data base stuff into a class.
+    
+    // this should be streated by the setupDatabase() method
+    //logDB.execute('CREATE TABLE IF NOT EXISTS LOGDATA (ID INTEGER PRIMARY KEY, EVENTID TEXT, DATA TEXT)');
+
+    //var rows = logDB.execute('SELECT * FROM LOGDATA GROUP BY EVENTID');
+    var rows = logDB.execute('SELECT * FROM LOGMETA ORDER BY startdate DESC');
+
+    //Titanium.API.info('ROW COUNT = ' + rows.getRowCount());
+    
+    // TODO: group the rows by eventID
+    var tmpData = [];
+    var previousSelection = selectedEvents.slice(0);
+    selectedEvents.splice(0,selectedEvents.length); // clear the list
+
+    if(rows.getRowCount() > 0) {
+        while(rows.isValidRow()){
+            //var thisData = rows.fieldByName('DATA');
+            //var thisObject = JSON.parse(thisData);
+            var thisTimestamp = rows.fieldByName('startdate');
+
+            var rowParams = {   title:new Date(thisTimestamp*1000).toLocaleString(), // only stored as seconds
+                                eventID:rows.fieldByName('eventid'),
+                                content:null,
+                                timestamp:thisTimestamp,
+                                duration:rows.fieldByName('duration'),
+                                distance:rows.fieldByName('distance'),
+                                logID:rows.fieldByName('logid')
+                                };
+
+            /* // notes on creating custom row layouts
+            row = Ti.UI.createTableViewRow();
+            row.hasDetail = true;
+            row.title = rows.field(1);
+            row.leftImage = '../images/film/small/'+rows.fieldByName('small_img');
+            data[rows.field(0)] = row;
+            rows.next();
+            */
+
+            // look up the eventid in the selectedEvents array.
+            if(previousSelection.indexOf(rowParams.eventID) >= 0) {
+                Ti.API.info('Found previously selected event');
+                rowParams.hasCheck = true;
+                selectedEvents.push(rowParams.eventID); // restore this selection
+            } else {
+                Ti.API.info('Found unselected event');
+                //rowParams.hasDetail = true;
+            }
+            tmpData.push(rowParams);
+            rows.next();
+        };
+    }
+    rows.close();
+    logDB.close();
+
+    // generate the custom rows, and push them to the data:
+    for (var i = 0; i < tmpData.length; i++) {
+        tmpData[i] = addLogRow(tmpData[i]);
+    };
+
+    // sort chronolocically:
+    //tmpData.sort(compareTime);
+
+    Ti.API.info('Got '+tmpData.length+' events');
+    Ti.API.info('Selected events: '+selectedEvents);
+
+    if(tmpData.length == 0) { 
+        tmpData.push({title:'No Logs recorded.',touchEnabled:false});
+    } else {
+        logTable.editable=true;
+    }
+
+    // update the data container
+    data = tmpData;
+
+    // this seems to only be available on iPhone.
+    if(Ti.Platform.name == "iPhone OS"){
+        Ti.API.info('Updating the iPhone log table');
+        logTable.setData(tmpData);
+    } else {
+        // hack for android
+        Ti.API.info('Updating the Android log table');
+        win.remove(logTable);
+        logTable.data = tmpData;
+        win.add(logTable);
+    }
+
+    // hide the activity indicator
+    actInd.hide();
+}
+
+// reload the logs when the window gains focus
+win.addEventListener('focus',function() {
+    loadLogs();
+    //selectedEvents = [];
+});
+
+// ensure that the db has been created
+// will this be a problem if logging is happening?
+win.addEventListener('open',function() { 
+    // if logging is already occurring, we can assume that the db has been created
+    // trying to avoid a db conflict
+    // otherwise, set up the db once.
+    // if(Ti.App.Properties.getString('eventid','') == ''){
+        // this is done in app.js now
+        //setupDatabase(); 
+    // }
+});
+
+// the android doesn't seem to be responding to focus or open events
+// TODO: fix me please
+if(Ti.Platform.name == 'android') {
+    loadLogs();
+    //selectedEvents = [];
+}
+
+
+function compareTime(a, b) {
+    return b.timestamp - a.timestamp;
+}
+
+
+// add delete event listener
+logTable.addEventListener('delete',function(e)
+{
+    // get the selected row's eventID
+    var eventID = e.row.eventID;
+    if (eventID == null ) {return;}
+
+    // assume that the swipe, then click on delete is confirmation enough
+    deleteEvent({eventid:eventID, confirmDelete:false});
+});
+
+
+
+// add the log table to the view.
+win.add(logTable);
 
 
 
