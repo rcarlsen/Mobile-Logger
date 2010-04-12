@@ -28,6 +28,8 @@ Ti.include('api.js');
 // reference the parent window
 var win = Ti.UI.currentWindow;
 
+
+
 function setLoggingState(state) {
     // set the preferences
     // the application should *always* have the loggingState false
@@ -975,7 +977,13 @@ function toggleDisplayVisibility (state) {
     //Ti.API.info('Finished toggling the dashboard visibility');
 }
 
-
+// toggle the display
+//win.addEventListener('dblclick',function(e){
+win.addEventListener('doubletap',function(e){
+    //Ti.API.info('Double click on window');
+    toggleDisplayVisibility();
+    //Ti.API.info('Should have toggled the display');
+});
 
 
 function setUnits () {
@@ -1310,11 +1318,7 @@ Titanium.Accelerometer.addEventListener('update',function(e)
 
 
 // Window event listener methods:
-// toggle the display
-//win.addEventListener('twofingertap',function(e){
-win.addEventListener('dblclick',function(e){
-    toggleDisplayVisibility();
-});
+
 
 
 // set up a listener to act every time the window is loaded
