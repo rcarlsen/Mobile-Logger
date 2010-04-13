@@ -5,7 +5,9 @@ Record location, heading, speed, altitude, accelerometer, sound level, trip dura
 
 Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.
 
-Available on the [App Store] (http://itunes.apple.com/us/app/mobilelogger/id365459773?mt=8 "App Store")
+Mobile Logger is written in JavaScript using the [Titanium Appcelerator](https://developer.appcelerator.com/get_started) Framework.
+
+Available on the [App Store](http://itunes.apple.com/us/app/mobilelogger/id365459773?mt=8 "App Store")
 
 ### Basic Documentation
 #### Begin logging
