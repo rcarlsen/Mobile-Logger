@@ -891,6 +891,9 @@ function displayDetail(rowData) {
 
     Titanium.UI.currentTab.open(newwin,{animated:true});
 
+    // hide the activity indicator
+    rowData.actInd.hide();
+
     // reset the flag to allow another detail page to load
     //setTimeout(function() {isLoadingDetail = false;},1000);
 
@@ -976,6 +979,14 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     row.logID = rowData.logID;
     row.name = rowData.title;
 
+    // add the activity indicator
+    row.actInd = Titanium.UI.createActivityIndicator({
+        left:250,
+        style:Titanium.UI.iPhone.ActivityIndicatorStyle.DARK
+    });
+    row.add(row.actInd);
+    row.actInd.hide();
+
     // add the child icon
     row.hasChild = true;
     //row.hasCheck = rowData.hasCheck;
@@ -988,7 +999,9 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 
 //        row.touchEnabled = false;
 //        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
-
+        
+        // change the row disclosure into the activity spinner
+        row.actInd.show();
         displayDetail(row);
 
 //        row.touchEnabled = true;
@@ -1060,7 +1073,11 @@ function loadLogs () {
                 Ti.API.info('Found unselected event');
                 //rowParams.hasDetail = true;
             }
-            tmpData.push(rowParams);
+
+            // trying to speed up the log list display
+            // by eliminating the second iterator
+            // maybe this will be bad for keeping the DB open too long.
+            tmpData.push(addLogRow(rowParams));
             rows.next();
         };
     }
@@ -1068,9 +1085,9 @@ function loadLogs () {
     logDB.close();
 
     // generate the custom rows, and push them to the data:
-    for (var i = 0; i < tmpData.length; i++) {
-        tmpData[i] = addLogRow(tmpData[i]);
-    };
+    //for (var i = 0; i < tmpData.length; i++) {
+        //tmpData[i] = addLogRow(tmpData[i]);
+    //};
 
     // sort chronolocically:
     //tmpData.sort(compareTime);
@@ -1109,6 +1126,7 @@ win.addEventListener('focus',function() {
     //selectedEvents = [];
 });
 
+
 // ensure that the db has been created
 // will this be a problem if logging is happening?
 win.addEventListener('open',function() { 
@@ -1119,15 +1137,17 @@ win.addEventListener('open',function() {
         // this is done in app.js now
         //setupDatabase(); 
     // }
+    //loadLogs();
 });
 
 // the android doesn't seem to be responding to focus or open events
 // TODO: fix me please
+/*
 if(Ti.Platform.name == 'android') {
     loadLogs();
     //selectedEvents = [];
 }
-
+*/
 
 function compareTime(a, b) {
     return b.timestamp - a.timestamp;
@@ -1143,6 +1163,8 @@ logTable.addEventListener('delete',function(e)
 
     // assume that the swipe, then click on delete is confirmation enough
     deleteEvent({eventid:eventID, confirmDelete:false});
+
+    loadLogs();
 });
 
 
