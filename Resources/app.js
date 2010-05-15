@@ -20,6 +20,8 @@
  */
 
 Ti.include('tools/util.js');
+Ti.include('main_windows/api.js');
+
 setupDatabase();
 
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)
@@ -44,6 +46,8 @@ var win1 = Titanium.UI.createWindow({
     navBarHidden:true
 // barColor:greenColor
 });
+
+
 var tab1 = Titanium.UI.createTab({  
     icon:'map-tab-icons.png',
     title:'Dashboard',
@@ -112,3 +116,69 @@ tabGroup.open();
 //        windowShade.hide();
 //    }
 //}
+//
+// Moved this to app.js to try to get the uploading on a different thread than the UI
+function sendBuffer(d) {
+    // d is an object with the doc buffer, eventID and deviceID.
+    if(d == null) {return;}
+    if(!d.hasOwnProperty('docBuffer') || d.docBuffer == null || d.docBuffer.length == 0) { return; }
+
+    //Ti.API.info('In the sendBuffer() method with: '+ d.docBuffer.toString() +
+                //', eventid: '+d.eventID+
+                //', deviceid: '+d.deviceID);
+
+    //Ti.API.info('Sending Buffer');
+    // send the batch of docIDs in the uploadBuffer
+    // need to retrieve them from the database 
+    var logDB = Ti.Database.open("log.db");
+ 
+    // using an array just isn't working, despite the documentation
+    //var rows = logDB.execute("SELECT _id,DATA FROM LOGDATA WHERE _id IN (?)",docString);
+
+    // instead, manually construct the SQL statement
+    var docString = d.docBuffer.join("','");
+    var sql = "SELECT * FROM LOGDATA WHERE _id IN ('"+docString+"')";
+    var rows = logDB.execute(sql);
+    
+    var docs = [];
+    var useDeviceID = Ti.App.Properties.getBool('omitDeviceID',false);
+    
+    while(rows.isValidRow()) {
+        // get the data from the row
+        var thisDoc = JSON.parse(rows.fieldByName('DATA'));
+       
+        // disabled at the moment, but ensure that uploaded records are numbers, not strings
+        // make sure that each field is a number
+        //for(var f in currentSample){
+        //    out[f] = parseFloat(currentSample[f]);
+        //}
+       
+        // add the docid
+        thisDoc._id = rows.fieldByName('_id');
+        // add the eventID
+        thisDoc.eventID = (d.hasOwnProperty('eventID')) ? d.eventID : -1;
+        // and the deviceID
+        if(!useDeviceID){
+            thisDoc.deviceID = (d.hasOwnProperty('deviceID')) ? d.deviceID : -1;
+        } else {
+            thisDoc.deviceID = -1;
+        }
+        docs.push(thisDoc);
+
+        //Ti.API.info(JSON.stringify(thisDoc));
+        rows.next();
+    }
+    rows.close();
+    logDB.close();
+
+    //Ti.API.info('Prepared docs for upload: '+docs.length);
+
+    // send this batch of samples
+    bulkUpload(docs);
+
+    //Ti.API.info('Finished upload');
+}
+
+// attach the sendBuffer method.
+// is this the correct way?
+win1.sendBuffer = sendBuffer;
