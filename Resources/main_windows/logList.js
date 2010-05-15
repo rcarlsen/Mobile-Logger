@@ -35,13 +35,20 @@ var win = Ti.UI.currentWindow;
 // add an activity indicator 
 // use this for slow loading stuff.
 var actInd = Titanium.UI.createActivityIndicator();
+actInd.zIndex = 100; // trying to bring this to the front. not working.
+
 if(Ti.Platform.name == 'iPhone OS') {
     //actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.BIG;
-    actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.DARK;
+    //actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.DARK;
+    // activity indicator should be light if it's on the orange navbar
+    actInd.style = Titanium.UI.iPhone.ActivityIndicatorStyle.LIGHT;
+    //
+    // for iPhone, add to nav bar
+    win.setRightNavButton(actInd);
+} else {
+    // for android, just overlay on top
+    win.add(actInd);
 }
-actInd.zIndex = 100; // trying to bring this to the front. not working.
-win.add(actInd);
-
 
 var selectedEvents = [];
 
@@ -708,7 +715,7 @@ function deleteEvent(params) {
         }
 
         // trigger a focus event, which will update the logTable data
-        win.fireEvent('focus');
+        //win.fireEvent('focus');
 
     }
 
