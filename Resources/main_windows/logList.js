@@ -1164,7 +1164,7 @@ logTable.addEventListener('delete',function(e)
     // assume that the swipe, then click on delete is confirmation enough
     deleteEvent({eventid:eventID, confirmDelete:false});
 
-    loadLogs();
+//    loadLogs();
 });
 
 
