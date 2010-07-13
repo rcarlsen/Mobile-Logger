@@ -178,12 +178,16 @@ function sendLog(params){
     // export the data in a selected format:
     var tmpDataString;
     switch(format) {
+        case 'gpx':
+            // GPX file format export
+            tmpDataString = exportGPXfile(tmpData);
+            break;
         case 'gc':
-            // testing GC file format export
+            // GC file format export
             tmpDataString = exportGCfile(tmpData);
             break;
         case 'csv':
-            // testing CSV file format export
+            // CSV file format export
             tmpDataString = exportCSV(tmpData);
             break;
         case 'json': 

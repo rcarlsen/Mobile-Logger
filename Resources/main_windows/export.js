@@ -210,3 +210,107 @@ function exportGCfile (data) {
     Ti.API.info('Returning GC file string');
     return results;
 }
+
+
+// GPX export
+//
+// GPX format XML file
+/*
+
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="Mobile Logger - http://mobilelogger.robertcarlsen.net/" version="1.1">
+    <wpt lat="45.44283" lon="-121.72904"><ele>1374</ele><name>Start</name></wpt>
+    <wpt lat="45.44283" lon="-121.72904"><ele>1374</ele><name>end</name></wpt>
+  <trk>
+    <name>Route: DateTime</name>
+    <trkseg>
+      <trkpt lat="45.4431641" lon="-121.7295456"><ele>2376</ele><time>2007-10-14T10:09:57.000Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
+
+*/
+function exportGPXfile(data) {
+    Ti.API.info('Inside exportGPXfile');
+
+    if(data == null) { return; }
+
+    // this expects a json array of sample objects
+    // it will create the attributes header
+    // then each of the sample elements with data
+    //
+
+    var startTime = data[0].timestamp;
+    var endTime = data[(data.length-1)].timestamp;
+
+    // GPX date parser expects ISO 8601: "2010-07-12T11:43Z"
+    var startDate = new Date(startTime).format('UTC:yyyy-mm-dd"T"HH:MM:ss"Z"');
+    var endDate = new Date(endTime).format('UTC:yyyy-mm-dd"T"HH:MM:ss"Z"');
+    // TODO: add milliseconds
+    Ti.API.info('Created timestamps');
+
+    var results = [];
+    results.push('<?xml version="1.0" encoding="UTF-8"?>');
+    results.push('<gpx creator="Mobile Logger - http://mobilelogger.robertcarlsen.net/" version="1.1">');
+
+    // start location
+    // TODO: Name and all...
+    results.push(element('wpt',element('name','Start'),{lon:data[0].lon,lat:data[0].lat}));
+    // TODO: end location
+    results.push(element('wpt',element('name','End'),{lon:data[(data.length-1)].lon,lat:data[(data.length-1)].lat}));
+
+    // add trk, name then all samples
+    results.push('<trk>');
+    results.push('<name>Mobile Logger - '+ new Date(startTime).format() +'</name>');
+
+    // now, iterate through all the data points:
+    // TODO: everything except lat/lon needs to be child elements, not attributes
+    results.push('<trkseg>');
+
+    for (var i = 0; i < data.length; i++) {
+        var thisData = [];
+
+        for(var datum in data[i]){
+            if(data[i].hasOwnProperty(datum)) {
+                if(i==0) { Ti.API.info('Datum: '+datum); }
+
+                switch(datum) {
+                    case 'speed':
+                        // meters/sec
+                        var s = data[i][datum];
+                        if(s != null) {
+                            thisData.push(element('speed',Math.max(0,s).toFixed(4)));
+                        }
+                        break;
+                    case 'timestamp':
+                        thisData.push(element('time', new Date(data[i][datum]).format("UTC:yyyy-mm-dd'T'HH:MM:ss'Z'")));
+                        break;
+                    case 'heading':
+                        thisData.push(element('course',data[i][datum].toFixed(2)));
+                        break;
+                    default:
+                        // NOP
+                        // thisData[datum] = data[i][datum];
+                        // Ti.API.info('Just added: '+datum+', as: '+thisData[datum]);
+                }
+            }
+        }
+        if(i==0) { Ti.API.info('Processed first sample: '+JSON.stringify(thisData)); }
+        results.push(element('trkpt',thisData.join(''),{lon:data[i].lon,lat:data[i].lat}));
+        //Ti.API.info('Added sample: '+thisData.join(''));
+    };
+
+    results.push('</trkseg>');
+    results.push('</trk>');
+    results.push('</gpx>');
+
+    Ti.API.info('Finished preparing GPX file');
+
+    results = results.join('\n');
+
+    // that's it!
+    Ti.API.info('Returning GPX file string');
+    return results;
+}
+
+

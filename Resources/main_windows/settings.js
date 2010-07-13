@@ -287,7 +287,7 @@ anonRow.header = '';
 inputData.push(anonRow);
 
 // trying to get the export to work
-var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah'},'csv');
+var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah',gpx:'GPX'},'csv');
 inputData.push(exportRow);
 
 // Set up an about message
