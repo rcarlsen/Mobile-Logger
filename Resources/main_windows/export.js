@@ -288,6 +288,9 @@ function exportGPXfile(data) {
                     case 'heading':
                         thisData.push(element('course',data[i][datum].toFixed(2)));
                         break;
+                    case 'alt':
+                        thisData.push(element('ele',data[i][datum].toFixed(2)));
+                        break;
                     default:
                         // NOP
                         // thisData[datum] = data[i][datum];
