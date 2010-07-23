@@ -2,7 +2,7 @@
 <ti:app xmlns:ti="http://ti.appcelerator.org">
 <id>net.robertcarlsen.MobileLogger</id>
 <name>MobileLogger</name>
-<version>1.2.2</version>
+<version>1.2.3</version>
 <publisher>Robert Carlsen</publisher>
 <url>http://robertcarlsen.net</url>
 <description>Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance.</description>

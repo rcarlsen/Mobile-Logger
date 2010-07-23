@@ -92,7 +92,7 @@ var loggingSwitch = Titanium.UI.createSwitch({
 var loggingLabel = Ti.UI.createLabel({
     top:5,
     right:10,
-    height:'auto',
+    height:20,
     textAlign:'right',
     text:'Logging:',
     color:'#333',
@@ -107,7 +107,7 @@ var loggingLabel = Ti.UI.createLabel({
 
 
 var accLabel = Ti.UI.createLabel({
-    height:'auto',
+    height:12,
     top:10,
     left:10,
     textAlign:'left',
@@ -130,7 +130,7 @@ var speedlabel = Titanium.UI.createLabel({
 	text:'0.0',
 	font:{fontSize:64,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
-    height:'auto',
+    height:80,
     top:60
 });
 
@@ -138,7 +138,7 @@ var speedUnitLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:22,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
-    height:'auto',
+    height:30,
     top:125,
     text:speedUnits
 });
@@ -147,7 +147,7 @@ var lonLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'left',
-    height:'auto',
+    height:22,
     top:10,left:10
 });
 
@@ -155,7 +155,7 @@ var latLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'left',
-    height:'auto',
+    height:22,
     top:30,left:10
 });
 
@@ -163,7 +163,7 @@ var headingLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:28,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
-    height:'auto',
+    height:34,
     top:20,
     text:'000\u00B0' // this is the degree symbol
 });
@@ -172,7 +172,7 @@ var cardinalLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
-    height:'auto',
+    height:22,
     top:48,
     text:'N' // for cardinal direction
 });
@@ -182,7 +182,7 @@ var headingAccuracyLabel = Ti.UI.createLabel({
     color:'#333',
     font:{fontSize:12,fontFamily:'Helvetica Neue'},
     textAlign:'center',
-    height:'auto',
+    height:16,
     top:45
 });
 
@@ -190,7 +190,7 @@ var accuracyLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:18,fontFamily:'Helvetica Neue',fontWeight:'bold'},
     textAlign:'center',
-    height:'auto',
+    height:22,
     bottom:120
 });
 
@@ -201,7 +201,7 @@ var compassView = Ti.UI.createView({
 });
 
 var compass = Ti.UI.createImageView({
-    url: '../images/small-compass-shadow.png',
+    image: '../images/small-compass-shadow.png',
     width:200,height:200,
     top:0
 });
@@ -240,19 +240,19 @@ var consoleView = Ti.UI.createView({
 });
 
 var consoleImage = Ti.UI.createImageView({
-    url:'../images/bottom.png',
+    image:'../images/bottom.png',
     width:320,height:82,
     bottom:0
 });
 
 var forceImage = Ti.UI.createImageView({
-    url:'../images/blue-circle.png',
+    image:'../images/blue-circle.png',
     width:62,height:62,
     bottom:48
 });
 
 var forceLabel = Ti.UI.createLabel({
-    height:'auto',
+    height:16,
     textAlign:'center',
     text:'0.0 g',
     color:'#333',
@@ -264,7 +264,7 @@ forceImage.add(forceLabel);
 // add a duration label
 var durationLabel = Ti.UI.createLabel({
     text:'0:00',
-    height:'auto',
+    height:40,
     textAlign:'left',
     color:'#333',
     font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
@@ -273,7 +273,7 @@ durationLabel.left = 10;
 
 var durationUnitLabel = Ti.UI.createLabel({
     text:'Duration',
-    height:'auto',
+    height:18,
     textAlign:'left',
     color:'#333',
     font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
@@ -285,7 +285,7 @@ consoleImage.add(durationLabel);
 // add a distance label
 var distanceLabel = Ti.UI.createLabel({
     text:'0.00',
-    height:'auto',
+    height:40,
     textAlign:'right',
     color:'#333',
     font:{fontSize:32,fontFamily:'Helvetica Neue',fontWeight:'bold'}
@@ -294,7 +294,7 @@ distanceLabel.right = 10;
 
 var distanceUnitLabel = Ti.UI.createLabel({
     text:distanceUnits,
-    height:'auto',
+    height:18,
     textAlign:'right',
     color:'#333',
     font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
@@ -309,7 +309,7 @@ consoleView.add(forceImage);
 
 
 var audioLevelImage = Ti.UI.createImageView({
-    url:'../images/orange-circle.png',
+    image:'../images/orange-circle.png',
     width:62,height:62,
     //center:{x:160,y:0},
     top:-31
@@ -317,7 +317,7 @@ var audioLevelImage = Ti.UI.createImageView({
 
 var audioLevelLabel = Ti.UI.createLabel({
     bottom:15,
-    height:'auto',
+    height:16,
     textAlign:'center',
     text:'Off',
     color:'#333',

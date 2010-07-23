@@ -71,7 +71,7 @@ function sendLog(params){
     var format = params.format;
     var eventID = params.eventID;
 
-    // format: [json, csv, gc]
+    // format: [json, csv, gc, ...]
     if(format == null) { format = Ti.App.Properties.getString('exportFormat','csv'); }
     if(eventID == null) { eventID = false; }
 
@@ -608,6 +608,11 @@ function addMapRow (logData) {
         mapwin.add(bigMap);
         Ti.API.info('added the map view to the new map window');
 
+        mapwin.addEventListener('close',function(e){
+            // remove the mapview
+            mapwin.remove(bigMap);
+        });
+
         Titanium.UI.currentTab.open(mapwin,{animated:true});
         Ti.API.info('Should have opened the map window');
     });
@@ -634,7 +639,7 @@ function addSummaryRow (label,value) {
         text:label,
         font:{fontSize:18,fontWeight:'bold'},
         left:10,
-        height:'auto'
+        height:24
     });
     row.add(cellLabel);
     //Ti.API.info('Created (and added) the title to the row');
@@ -645,7 +650,7 @@ function addSummaryRow (label,value) {
         font:{fontSize:16},
         textAlign:'right',
         right:10,
-        height:'auto'
+        height:22
     });
     row.add(cellValue);
     //Ti.API.info('Created (and added) the value label to the row');
@@ -925,7 +930,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         text:rowData.title,
         font:{fontSize:15,fontWeight:'bold'},
         left:10,top:10,
-        height:'auto'
+        height:21
     });
     row.add(cellLabel);
     Ti.API.info('Created (and added) the title to the row');
