@@ -24,6 +24,8 @@ Ti.include('main_windows/api.js');
 
 setupDatabase();
 
+Ti.Geolocation.purpose = "Log location, movement and sound.";
+
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)
 Titanium.UI.setBackgroundColor('#000');
 
