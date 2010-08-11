@@ -202,67 +202,75 @@ function sendLog(params){
     // naive attempt to create the json string
     //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
 
+    if(tmpDataString) {
+        // TODO: add as a file attachment, rather than a string.
+        // emailView.setMessageBody(tmpDataString);
+        emailView.setMessageBody('Log file attached in '+format+' format.');
+        
+        // this is a huge string
+        //Ti.API.info('output string: '+tmpDataString);
 
-    // TODO: add as a file attachment, rather than a string.
-    // emailView.setMessageBody(tmpDataString);
-    emailView.setMessageBody('Log file attached in '+format+' format.');
-    
-    // this is a huge string
-    //Ti.API.info('output string: '+tmpDataString);
+        // Save the data as a temp file, the attach to an e-mail:
+        // So this all works...for now. Maybe they'll change the 
+        // methods in a future release.
+        // For the moment, though...does the temp dir clear itself?
+        var tempFile = Ti.Filesystem.createTempFile();
+        Ti.API.info('Created temp file: '+tempFile.toString());
+       
+        // construct a filename based on the date
+        // TODO: look to see if the log has already been exported?
+        // what about a log that has had more data added to it?
+        // There has to be a better way to replace these strings or to build the name.
+        var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
+        Ti.API.info(dateString);
+        var outfilename = '/Log_'+dateString+'.'+format;
 
-    // Save the data as a temp file, the attach to an e-mail:
-    // So this all works...for now. Maybe they'll change the 
-    // methods in a future release.
-    // For the moment, though...does the temp dir clear itself?
-    var tempFile = Ti.Filesystem.createTempFile();
-    Ti.API.info('Created temp file: '+tempFile.toString());
-   
-    // construct a filename based on the date
-    // TODO: look to see if the log has already been exported?
-    // what about a log that has had more data added to it?
-    // There has to be a better way to replace these strings or to build the name.
-    var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
-    Ti.API.info(dateString);
-    var outfilename = '/Log_'+dateString+'.'+format;
+        var result = tempFile.rename(tempFile.getParent()+outfilename);
+        Ti.API.info('move result: '+result);
+        Ti.API.info('renamed the temp file to: '+tempFile.name);
 
-    var result = tempFile.rename(tempFile.getParent()+outfilename);
-    Ti.API.info('move result: '+result);
-    Ti.API.info('renamed the temp file to: '+tempFile.name);
+        tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
+        tempFile.write(tmpDataString);
+        Ti.API.info('wrote to temp log file: '+tempFile.resolve());
 
-    tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
-    tempFile.write(tmpDataString);
-    Ti.API.info('wrote to temp log file: '+tempFile.resolve());
+        //var tempContents = tempFile.read();
+        //Ti.API.info('temp file contents: '+tempContents.text);
 
-    //var tempContents = tempFile.read();
-    //Ti.API.info('temp file contents: '+tempContents.text);
+        // Do we need to clean up after ourselves?
+        // Does the filesystem clean up the temp dir?
+        //tempFile.deleteFile();
+        //Ti.API.info('deleted temp file at: '+tempFile.resolve());
+       
+        // Add the log as an attachment to the e-mail message
+        emailView.addAttachment(tempFile);
 
-    // Do we need to clean up after ourselves?
-    // Does the filesystem clean up the temp dir?
-    //tempFile.deleteFile();
-    //Ti.API.info('deleted temp file at: '+tempFile.resolve());
-   
-    // Add the log as an attachment to the e-mail message
-    emailView.addAttachment(tempFile);
-
-    emailView.addEventListener('complete',function(e)
-    {
-        if (e.result == emailView.SENT)
+        emailView.addEventListener('complete',function(e)
         {
-            // TODO: this isn't really necessary, is it?
-            // alert("Mail sent.");
-        }
-        else if(e.result == emailView.FAILED)
-        {
-            var alertDialog = Titanium.UI.createAlertDialog({
-                title: 'Problem',
-                message: 'There was a problem. Check your network connection.', // DEBUG: '+e.result,
-                buttonNames: ['OK']
-            });
-            alertDialog.show();
-        }
-    });
-    emailView.open();
-
+            if (e.result == emailView.SENT)
+            {
+                // TODO: this isn't really necessary, is it?
+                // alert("Mail sent.");
+            }
+            else if(e.result == emailView.FAILED)
+            {
+                var alertDialog = Titanium.UI.createAlertDialog({
+                    title: 'Problem',
+                    message: 'There was a problem. Check your network connection.', // DEBUG: '+e.result,
+                    buttonNames: ['OK']
+                });
+                alertDialog.show();
+            }
+        });
+        emailView.open();
+    }
+    else {
+        // display an alert
+        var errorAlert = Ti.UI.createAlertDialog({
+            title:'Export error',
+            message:'There was an error with data export. Try another format.'
+        });
+        errorAlert.show();
+    }
     // hide the activity indicator
     activity.hide();
 

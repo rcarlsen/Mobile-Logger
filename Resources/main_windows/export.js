@@ -224,7 +224,13 @@ function exportGCfile (data) {
   <trk>
     <name>Route: DateTime</name>
     <trkseg>
-      <trkpt lat="45.4431641" lon="-121.7295456"><ele>2376</ele><time>2007-10-14T10:09:57.000Z</time></trkpt>
+      <trkpt lat="45.4431641" lon="-121.7295456">
+        <ele>2376</ele>
+        <time>2007-10-14T10:09:57.000Z</time>
+        <extensions>
+          ..other data..
+        </extensions>
+      </trkpt>
     </trkseg>
   </trk>
 </gpx>
@@ -255,9 +261,22 @@ function exportGPXfile(data) {
 
     // start location
     // TODO: Name and all...
-    results.push(element('wpt',element('name','Start'),{lon:data[0].lon,lat:data[0].lat}));
-    // TODO: end location
-    results.push(element('wpt',element('name','End'),{lon:data[(data.length-1)].lon,lat:data[(data.length-1)].lat}));
+    // find the first valid data point:
+    for(var _i = 0; _i < data.length; _i++) {
+        if(data[_i].hasOwnProperty('lon')) { break; } // assume that lat and lon come together
+    }
+    if(_i >= data.length-1) {
+        // something is wrong - no location
+        Ti.API.info('No location data found for GPX export');
+        return false;
+    }
+    results.push(element('wpt',element('name','Start'),{lon:data[_i].lon,lat:data[_i].lat}));
+
+    // find the last valid data point:
+    for(var _j = data.length - 1; _j > _i; _j--) { // start at the end and work back
+        if(data[_j].hasOwnProperty('lon')) { break; }
+    }
+    results.push(element('wpt',element('name','End'),{lon:data[_j].lon,lat:data[_j].lat}));
 
     // add trk, name then all samples
     results.push('<trk>');
@@ -269,10 +288,11 @@ function exportGPXfile(data) {
 
     for (var i = 0; i < data.length; i++) {
         var thisData = [];
+        var ext = []; // for extra sensor data
 
         for(var datum in data[i]){
             if(data[i].hasOwnProperty(datum)) {
-                if(i==0) { Ti.API.info('Datum: '+datum); }
+                if(i==0) { Ti.API.info('Datum: '+datum); }  
 
                 switch(datum) {
                     case 'speed':
@@ -291,14 +311,21 @@ function exportGPXfile(data) {
                     case 'alt':
                         thisData.push(element('ele',data[i][datum].toFixed(2)));
                         break;
+                    case 'lat':
+                    case 'lon':
+                        // do nothing, this gets handled later
+                        break;
                     default:
-                        // NOP
+                        ext.push(element(datum,data[i][datum]));
                         // thisData[datum] = data[i][datum];
                         // Ti.API.info('Just added: '+datum+', as: '+thisData[datum]);
                 }
             }
         }
+        if(ext.length > 0) { thisData.push(element('extensions',ext.join(''))); }
         if(i==0) { Ti.API.info('Processed first sample: '+JSON.stringify(thisData)); }
+        
+        if(data[i].lon == null || data[i].lat == null) { continue; } 
         results.push(element('trkpt',thisData.join(''),{lon:data[i].lon,lat:data[i].lat}));
         //Ti.API.info('Added sample: '+thisData.join(''));
     };
