@@ -594,19 +594,21 @@ function updateDistanceLabel (delta) {
 }
 
 function rotateCompass(degrees) {
-    // cloud 1 animation/transform
 	// don't interrupt the current animation
-    if(compass.animating) { return; }
+    // if(compass.animating) { return; }
     
-    var t = Ti.UI.create2DMatrix();
-	t = t.rotate(360-parseFloat(degrees));
+    var t = Ti.UI.create2DMatrix().rotate(360-parseFloat(degrees));
+    compass.transform = t;
 
-	var a = Titanium.UI.createAnimation();
+    // ignore the nice rotation for now, just get the compas to move correctly
+    /*
+    var a = Titanium.UI.createAnimation();
 	a.transform = t;
 	a.duration = 100;
 	a.autoreverse = false;
 	a.repeat = 0;
 	compass.animate(a); // TODO: rotate a compass widget instead
+    */
 }
 
 function updateLocationData(e) {
