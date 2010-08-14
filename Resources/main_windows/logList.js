@@ -215,7 +215,7 @@ function sendLog(params){
         // methods in a future release.
         // For the moment, though...does the temp dir clear itself?
         var tempFile = Ti.Filesystem.createTempFile();
-        Ti.API.info('Created temp file: '+tempFile.toString());
+        Ti.API.info('Created temp file: '+tempFile.path);
        
         // construct a filename based on the date
         // TODO: look to see if the log has already been exported?
@@ -223,15 +223,26 @@ function sendLog(params){
         // There has to be a better way to replace these strings or to build the name.
         var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
         Ti.API.info(dateString);
-        var outfilename = '/Log_'+dateString+'.'+format;
+        var outfilename = 'Log_'+dateString+'.'+format;
 
-        var result = tempFile.rename(tempFile.getParent()+outfilename);
+        var result = tempFile.move(tempFile.getParent()+outfilename);
         Ti.API.info('move result: '+result);
         Ti.API.info('renamed the temp file to: '+tempFile.name);
 
         tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
         tempFile.write(tmpDataString);
         Ti.API.info('wrote to temp log file: '+tempFile.resolve());
+
+        // Compress the newly created temp file
+       var zipFilePath = Ti.Compression.compressFile(tempFile.path);
+       Ti.API.info('zip file path: '+zipFilePath);
+
+        if(zipFilePath) { // it was successful, attach this
+            emailView.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+        }
+        else {
+            emailView.addAttachment(tempFile);
+        }
 
         //var tempContents = tempFile.read();
         //Ti.API.info('temp file contents: '+tempContents.text);
@@ -242,7 +253,7 @@ function sendLog(params){
         //Ti.API.info('deleted temp file at: '+tempFile.resolve());
        
         // Add the log as an attachment to the e-mail message
-        emailView.addAttachment(tempFile);
+        //emailView.addAttachment(tempFile);
 
         emailView.addEventListener('complete',function(e)
         {

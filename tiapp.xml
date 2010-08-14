@@ -14,4 +14,7 @@
     <statusbar-hidden>false</statusbar-hidden>
     <analytics>false</analytics>
 <guid>85e942c2-cae5-48e1-8f05-d32621ee71bf</guid>
+<modules>
+    <module version="0.1">CompressionModule</module>
+</modules>
 </ti:app>

@@ -262,6 +262,71 @@ function addInfoRow(label,property)
 
 }
 
+
+// add export db file row
+
+function addExportDbRow(label)
+{
+	var row = Ti.UI.createTableViewRow({height:50});
+    row.backgroundColor = '#fff';
+    row.hasChild = true;
+    //row.header = '';
+
+        // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:16,fontWeight:'bold'},
+        left:10
+    });
+    row.add(cellLabel);
+
+    // get the db and list the size...this could be a memory killer
+    // hack to clean up the busted path
+    var dbPath = Ti.Filesystem.applicationDirectory;
+    dbPath = dbPath.substring(0,dbPath.length - 'Applications'.length);
+    dbPath += 'Library/Application Support/database/log.db.sql';
+
+    // iPhone only path. Is this a fragile path, too?
+    var f = Ti.Filesystem.getFile(dbPath);
+    Ti.API.info('db file exists: '+ ((f.exists) ? 'yes' : 'no') +' path: '+dbPath);
+
+    var cellValue = Ti.UI.createLabel({
+        text:(f.read.size/1024) + ' kB',
+        font:{fontSize:14},
+        textAlign:'right',
+        right:20
+    });
+    row.add(cellValue);
+
+
+    // add a child view
+    row.addEventListener('click',function(e){
+
+        Ti.API.info('In the about row click event');
+
+        var emailDialog = Titanium.UI.createEmailDialog();
+        emailDialog.barColor = orangeColor;
+
+        emailDialog.subject = "Mobile Logger Database";
+        //emailDialog.toRecipients = ['foo@yahoo.com'];
+        emailDialog.messageBody = 'Attached is the sqlite database file from Mobile Logger.';
+        // Compress the newly created temp file
+        var zipFilePath = Ti.Compression.compressFile(f.path);
+        Ti.API.info('zip file path: '+zipFilePath);
+
+        if(zipFilePath) { // it was successful, attach this
+            emailDialog.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+        }
+        else {
+            emailDialog.addAttachment(f);
+        }
+        emailDialog.open();
+    });
+    row.className = 'exportdb';
+    return row;
+}
+
 // set up the settings table rows:
 var inputData = [];
 
@@ -289,6 +354,7 @@ inputData.push(anonRow);
 // trying to get the export to work
 var exportRow = addExportRow('Export Format','exportFormat',{csv:'CSV',json:'JSON',gc:'Golden Cheetah',gpx:'GPX'},'csv');
 inputData.push(exportRow);
+inputData.push(addExportDbRow('Export DB'));
 
 // Set up an about message
 var aboutString = 
