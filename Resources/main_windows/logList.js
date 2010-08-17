@@ -27,6 +27,7 @@ var blueColor = '#c8e6ff';
 
 Ti.include('../tools/json2.js');
 Ti.include('export.js');
+Ti.include('api.js');
 Ti.include('../tools/date.format.js');
 Ti.include('../tools/util.js');
 
@@ -117,6 +118,7 @@ function sendLog(params){
     //sendButton.enabled = false;
     //sendButton.touchEnabled = false;
     isExporting = true;
+    var useDeviceID = Ti.App.Properties.getBool('omitDeviceID',false);
 
     // retrieve the rows and setup an email message
     var sampleData;
@@ -156,11 +158,22 @@ function sendLog(params){
     var tmpData=[];
     while(rows.isValidRow()){
         var thisData = JSON.parse(rows.fieldByName('DATA'));
-        
-        // insert the extra fields:
-        thisData.eventID = selectedEventID;
-        thisData.deviceID = deviceID;
 
+        // insert the extra fields:
+        // couchdb doc id - to prevent duplicates
+        thisData._id = rows.fieldByName('_id');
+
+        // hash for event id
+        thisData.eventID = selectedEventID;
+
+        // only include device id if premitted by user
+        if(!useDeviceID){
+            thisData.deviceID = deviceID;
+        } else {
+            thisData.deviceID = -1;
+        }
+
+        Ti.API.info('data: '+JSON.stringify(thisData));
         tmpData.push(thisData);
         rows.next();
     };
@@ -169,119 +182,139 @@ function sendLog(params){
 
     Ti.API.info('log row count: '+tmpData.length);
 
-    // ok, now construct the email window
-    var emailView = Ti.UI.createEmailDialog();
-    emailView.barColor = orangeColor;
-
-    emailView.setSubject(' Log data');
-  
-    // export the data in a selected format:
-    var tmpDataString;
-    switch(format) {
-        case 'gpx':
-            // GPX file format export
-            tmpDataString = exportGPXfile(tmpData);
-            break;
-        case 'gc':
-            // GC file format export
-            tmpDataString = exportGCfile(tmpData);
-            break;
-        case 'csv':
-            // CSV file format export
-            tmpDataString = exportCSV(tmpData);
-            break;
-        case 'json': 
-            // much more robust approach to create a json string
-            tmpDataString = JSON.stringify(tmpData);
-            break;
-        default:
-            // much more robust approach to create a json string
-            tmpDataString = JSON.stringify(tmpData);
-    }
-    
-    // naive attempt to create the json string
-    //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
-
-    if(tmpDataString) {
-        // TODO: add as a file attachment, rather than a string.
-        // emailView.setMessageBody(tmpDataString);
-        emailView.setMessageBody('Log file attached in '+format+' format.');
-        
-        // this is a huge string
-        //Ti.API.info('output string: '+tmpDataString);
-
-        // Save the data as a temp file, the attach to an e-mail:
-        // So this all works...for now. Maybe they'll change the 
-        // methods in a future release.
-        // For the moment, though...does the temp dir clear itself?
-        var tempFile = Ti.Filesystem.createTempFile();
-        Ti.API.info('Created temp file: '+tempFile.path);
-       
-        // construct a filename based on the date
-        // TODO: look to see if the log has already been exported?
-        // what about a log that has had more data added to it?
-        // There has to be a better way to replace these strings or to build the name.
-        var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
-        Ti.API.info(dateString);
-        var outfilename = 'Log_'+dateString+'.'+format;
-
-        var result = tempFile.move(tempFile.getParent()+outfilename);
-        Ti.API.info('move result: '+result);
-        Ti.API.info('renamed the temp file to: '+tempFile.name);
-
-        tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
-        tempFile.write(tmpDataString);
-        Ti.API.info('wrote to temp log file: '+tempFile.resolve());
-
-        // Compress the newly created temp file
-       var zipFilePath = Ti.Compression.compressFile(tempFile.path);
-       Ti.API.info('zip file path: '+zipFilePath);
-
-        if(zipFilePath) { // it was successful, attach this
-            emailView.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+    // here's the logic branch for uploading to the db rather than export via e-mail
+    //
+    if(format == 'upload') {
+        // TODO: would like to include a progress bar here:
+        try {
+            Ti.API.info('about to start a bulk upload');
+            bulkUpload(tmpData);
+            Ti.API.info('just sent a bulk upload');
+        } catch(err) {
+            Ti.API.info('There was an error with bulkUpload()');
+            var alertDialog = Titanium.UI.createAlertDialog({
+                title: 'Upload Problem',
+                message: 'There was a problem. Check your network connection.',
+                buttonNames: ['OK']
+            });
+            alertDialog.show();
         }
-        else {
-            emailView.addAttachment(tempFile);
-        }
-
-        //var tempContents = tempFile.read();
-        //Ti.API.info('temp file contents: '+tempContents.text);
-
-        // Do we need to clean up after ourselves?
-        // Does the filesystem clean up the temp dir?
-        //tempFile.deleteFile();
-        //Ti.API.info('deleted temp file at: '+tempFile.resolve());
-       
-        // Add the log as an attachment to the e-mail message
-        //emailView.addAttachment(tempFile);
-
-        emailView.addEventListener('complete',function(e)
-        {
-            if (e.result == emailView.SENT)
-            {
-                // TODO: this isn't really necessary, is it?
-                // alert("Mail sent.");
-            }
-            else if(e.result == emailView.FAILED)
-            {
-                var alertDialog = Titanium.UI.createAlertDialog({
-                    title: 'Problem',
-                    message: 'There was a problem. Check your network connection.', // DEBUG: '+e.result,
-                    buttonNames: ['OK']
-                });
-                alertDialog.show();
-            }
-        });
-        emailView.open();
     }
     else {
-        // display an alert
-        var errorAlert = Ti.UI.createAlertDialog({
-            title:'Export error',
-            message:'There was an error with data export. Try another format.'
-        });
-        errorAlert.show();
+        // export the data in a selected format:
+        var tmpDataString;
+        switch(format) {
+            case 'gpx':
+                // GPX file format export
+                tmpDataString = exportGPXfile(tmpData);
+                break;
+            case 'gc':
+                // GC file format export
+                tmpDataString = exportGCfile(tmpData);
+                break;
+            case 'csv':
+                // CSV file format export
+                tmpDataString = exportCSV(tmpData);
+                break;
+            case 'json': 
+                // much more robust approach to create a json string
+                tmpDataString = JSON.stringify(tmpData);
+                break;
+            default:
+                // much more robust approach to create a json string
+                tmpDataString = JSON.stringify(tmpData);
+        }
+ 
+        // naive attempt to create the json string
+        //var tmpDataString = '['+ tmpData.join(',\n') +']'; // create a JSON string
+
+        // ok, now construct the email window
+        var emailView = Ti.UI.createEmailDialog();
+        emailView.barColor = orangeColor;
+        emailView.setSubject(' Log data');
+
+        if(tmpDataString) {
+            // TODO: add as a file attachment, rather than a string.
+            // emailView.setMessageBody(tmpDataString);
+            emailView.setMessageBody('Log file attached in '+format+' format.');
+
+            // this is a huge string
+            //Ti.API.info('output string: '+tmpDataString);
+
+            // Save the data as a temp file, the attach to an e-mail:
+            // So this all works...for now. Maybe they'll change the 
+            // methods in a future release.
+            // For the moment, though...does the temp dir clear itself?
+            var tempFile = Ti.Filesystem.createTempFile();
+            Ti.API.info('Created temp file: '+tempFile.path);
+
+            // construct a filename based on the date
+            // TODO: look to see if the log has already been exported?
+            // what about a log that has had more data added to it?
+            // There has to be a better way to replace these strings or to build the name.
+            var dateString = startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
+            Ti.API.info(dateString);
+            var outfilename = 'Log_'+dateString+'.'+format;
+
+            var result = tempFile.move(tempFile.getParent()+outfilename);
+            Ti.API.info('move result: '+result);
+            Ti.API.info('renamed the temp file to: '+tempFile.name);
+
+            tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
+            tempFile.write(tmpDataString);
+            Ti.API.info('wrote to temp log file: '+tempFile.resolve());
+
+            // Compress the newly created temp file
+           var zipFilePath = Ti.Compression.compressFile(tempFile.path);
+           Ti.API.info('zip file path: '+zipFilePath);
+
+            if(zipFilePath) { // it was successful, attach this
+                emailView.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+            }
+            else {
+                emailView.addAttachment(tempFile);
+            }
+
+            //var tempContents = tempFile.read();
+            //Ti.API.info('temp file contents: '+tempContents.text);
+
+            // Do we need to clean up after ourselves?
+            // Does the filesystem clean up the temp dir?
+            //tempFile.deleteFile();
+            //Ti.API.info('deleted temp file at: '+tempFile.resolve());
+
+            // Add the log as an attachment to the e-mail message
+            //emailView.addAttachment(tempFile);
+
+            emailView.addEventListener('complete',function(e)
+            {
+                if (e.result == emailView.SENT)
+                {
+                    // TODO: this isn't really necessary, is it?
+                    // alert("Mail sent.");
+                }
+                else if(e.result == emailView.FAILED)
+                {
+                    var alertDialog = Titanium.UI.createAlertDialog({
+                        title: 'Problem',
+                        message: 'There was a problem. Check your network connection.', // DEBUG: '+e.result,
+                        buttonNames: ['OK']
+                    });
+                    alertDialog.show();
+                }
+            });
+            emailView.open();
+        }
+        else {
+            // display an alert
+            var errorAlert = Ti.UI.createAlertDialog({
+                title:'Export error',
+                message:'There was an error with data export. Try another format.'
+            });
+            errorAlert.show();
+        }
     }
+
     // hide the activity indicator
     activity.hide();
 
@@ -822,7 +855,45 @@ function displayDetail(rowData) {
         sendButton.enabled = false;
         sendButton.touchEnabled = false;
 
-        sendLog({eventID:rowData.eventID});
+        // set up and display an action sheet with upload choices:
+        var optionsDialog = Titanium.UI.createOptionDialog({
+           options:['Upload', 'Email', 'Cancel'],
+           //destructive:2,
+           cancel:2,
+           title:'Export Log'
+        });
+
+
+        // TODO: add a listener to conditionally act on the response.
+        // This may be better suited to display differently based on each platform's
+        // UX paradigms.
+        optionsDialog.addEventListener('click',function(oe){
+           // these properties aren't being provided correctly.
+           if(oe.cancel == true) { 
+               Ti.API.info('Cancel button pressed');
+               return; 
+           }
+               switch(oe.index) {
+                   case 0: // upload
+                       Ti.API.info('Button 0 pressed.');
+                       sendLog({format:'upload',eventID:rowData.eventID});
+                       break;
+                   case 1: // email
+                       Ti.API.info('Button 1 pressed.');
+                       sendLog({eventID:rowData.eventID});
+                       break;
+                   case 2:
+                       Ti.API.info('Cancel button pressed');
+                       break;
+                   default:
+                       Ti.API.info('Default case in options dialog.');
+                       return;
+           }
+        });
+
+       // Ti.API.info('Showing the options dialog');
+       optionsDialog.show();
+
 
         setTimeout(function() {
             sendButton.enabled = true;
