@@ -173,7 +173,7 @@ function sendLog(params){
             thisData.deviceID = -1;
         }
 
-        Ti.API.info('data: '+JSON.stringify(thisData));
+        //Ti.API.info('data: '+JSON.stringify(thisData));
         tmpData.push(thisData);
         rows.next();
     };
