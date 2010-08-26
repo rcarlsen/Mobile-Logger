@@ -46,7 +46,6 @@ var win1 = Titanium.UI.createWindow({
     // title:'Dashboard',
     backgroundColor:'#ccc',
     navBarHidden:true
-// barColor:greenColor
 });
 
 
@@ -180,6 +179,77 @@ function sendBuffer(d) {
 
     //Ti.API.info('Finished upload');
 }
+
+var progressView;
+var progressBar;
+function uploadProgress(w,v)
+{
+    // want this to display a progress bar
+    // should also generate a view 
+    //
+    if(w == null) { return; }
+    if(v == null) { v = 0; }
+
+    if(progressView == null) {
+        // create a view...then add the bar to it.
+        // then add it to the current window
+        //
+        Ti.API.info('Creating a progress view');
+        progressView = Ti.UI.createView({
+            top:0,
+            width:320, // adjust this to fit the window
+            height:50,
+            backgroundColor:'#666',
+            opacity:0
+        });
+
+        Ti.API.info('Creating the upload progress bar');
+        progressBar = Titanium.UI.createProgressBar({
+            width:250,
+            min:0,
+            max:10,
+            value:0,
+            color:'#fff',
+            message:'Upload Progress',
+            font:{fontSize:14, fontWeight:'bold'},
+            style:Titanium.UI.iPhone.ProgressBarStyle.PLAIN
+        });
+        progressView.add(progressBar);
+        progressBar.show();
+        w.add(progressView);
+
+        progressView.animate({opacity:0.9,duration:250});
+
+        var val = 0;
+        var interval = setInterval(function()
+        {
+            if(val == 11) {
+                clearInterval(interval);
+
+                if(progressView) { // how to detect that progressView is still available?
+                    Ti.API.info('About to fade the progress view');
+                    progressView.animate({opacity:0,duration:250},function() {
+                        w.remove(progressView);
+                        progressView = null;
+                    });
+                } else {
+                    Ti.API.info('Just hide the progress view');
+                    w.remove(progressView);
+                    progressView = null;
+                }
+            }
+            progressBar.value = ++val;
+        },500);
+    }
+    
+    Ti.API.info('Setting the progress bar value: '+ v);
+    progressBar.value = v;
+
+}
+
+
+// attach the 
+win2.uploadProgress = uploadProgress;
 
 // attach the sendBuffer method.
 // is this the correct way?

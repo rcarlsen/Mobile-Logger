@@ -849,6 +849,9 @@ function displayDetail(rowData) {
     }
     //TODO: should this display the options dialog?
     sendButton.addEventListener('click',function(){
+        // just testing
+        win.uploadProgress(newwin);
+        
         Ti.API.info('Send button pressed. isExporting == '+isExporting);
         
         // temporarily disable the button to prevent a double-tap
