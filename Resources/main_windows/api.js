@@ -47,6 +47,20 @@ function uploadSample (sample) {
 function bulkUpload (samples) {
     if(samples == null || samples.length == 0) { return; }
 
+
+// how do we create an event callback here?
+// the idea is that we send batches of samples to the server
+// and after every batch we issue a callback to let the 
+// device update the display
+
+
+// from a functional standpoint, this will have to be several
+// http requests won't it? Loop thru all the elements?
+
+    var range = {index: 0, length: 100};
+    if(range.length > samples.length) {range.length = samples.length;}
+
+    
     var xhr = Titanium.Network.createHTTPClient();
     xhr.onload = function()
     {
@@ -54,7 +68,14 @@ function bulkUpload (samples) {
         //Ti.API.info('With response: '+this.responseText);
 
         //TODO: the response is an array of the new doc ids
-        //we need to store those docs ids to prevent duplicate docs
+        //we need to store those docs ids to prevent duplicate doc
+        //
+        // this is where a new upload needs to occur
+        // TODO: evaluate if this method is highly wasteful of memory
+        if(samples.length > range.length) {
+            bulkUpload(samples.slice(range.length-1,samples.length-1));
+        }
+
         return this.responseText;
     };
     xhr.onerror = function()
@@ -63,7 +84,8 @@ function bulkUpload (samples) {
         return this.responseText;
     };
     // TODO: get the url from the properties
-    var out = {docs:samples};
+    // TODO: what's the array split/subarray command?
+    var out = {docs:samples.slice(range.index,range.length-1)};
 
     xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
     xhr.send("data="+JSON.stringify(out));
