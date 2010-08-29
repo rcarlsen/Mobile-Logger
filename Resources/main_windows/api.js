@@ -24,6 +24,14 @@
 // get the database from the properties
 //
 
+// conduit for messages
+// expecting that the app will attach the progress meter to it.
+var _api = {};
+function api() {
+    return _api;
+}
+
+
 function uploadSample (sample) {
     if(sample == null) { return; }
 
@@ -44,9 +52,14 @@ function uploadSample (sample) {
     xhr.send("data="+JSON.stringify(sample));
 }
 
+
+var xhr = Titanium.Network.createHTTPClient();
+var progress;
+var cancel;
 function bulkUpload (samples) {
     if(samples == null || samples.length == 0) { return; }
-
+    
+    Ti.API.info('cancel status in bulkUpload: '+cancel);
 
 // how do we create an event callback here?
 // the idea is that we send batches of samples to the server
@@ -60,10 +73,26 @@ function bulkUpload (samples) {
     var range = {index: 0, length: 100};
     if(range.length > samples.length) {range.length = samples.length;}
 
-    
-    var xhr = Titanium.Network.createHTTPClient();
+    // start the progress meter
+    if(progress == null) {
+        cancel = false;
+        progress = samples.length;
+
+        Ti.API.info('About to tell app to create a new progress bar');
+        Ti.UI.currentWindow.fireEvent('uploadProgress',{value:0});
+    }
+
+    // var xhr = Titanium.Network.createHTTPClient();
     xhr.onload = function()
     {
+        Ti.API.info('cancel status in onload function: '+cancel);
+
+        if(cancel) {
+            Ti.UI.currentWindow.fireEvent('uploadProgress',{value:-1});
+            progress = null;
+            return 'Cancelled by user';
+        }
+        
         //Ti.API.info('POSTed samples: '+JSON.stringify(sample));
         //Ti.API.info('With response: '+this.responseText);
 
@@ -72,21 +101,46 @@ function bulkUpload (samples) {
         //
         // this is where a new upload needs to occur
         // TODO: evaluate if this method is highly wasteful of memory
+        //
+        var pmeter = 1-(samples.length/progress);
+        Ti.API.info('Upload pogress in bulkUpload(): '+pmeter);
+
+        Ti.UI.currentWindow.fireEvent('uploadProgress',{value:pmeter});
+
         if(samples.length > range.length) {
-            bulkUpload(samples.slice(range.length-1,samples.length-1));
+            bulkUpload(samples.slice(range.length-1));
+        }
+        else {
+            // done with the upload
+            Ti.UI.currentWindow.fireEvent('uploadProgress',{value:1.0});
+            progress = null;
         }
 
         return this.responseText;
     };
     xhr.onerror = function()
     {
+        Ti.UI.currentWindow.fireEvent('uploadProgress',{value:-1});
+        progress = null;
+
         Ti.API.info('Upload error: '+this.responseText);
         return this.responseText;
     };
     // TODO: get the url from the properties
     // TODO: what's the array split/subarray command?
-    var out = {docs:samples.slice(range.index,range.length-1)};
+    var out = {docs:samples.slice(range.index,range.length)};
 
     xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
     xhr.send("data="+JSON.stringify(out));
+}
+
+
+function cancelUpload() {
+    //if(xhr.connected) {
+        cancel = true;
+        xhr.abort();
+        
+        Ti.API.info('Cancelling xhr request');
+        Ti.API.info('cancel variable: '+cancel);
+    //}
 }
