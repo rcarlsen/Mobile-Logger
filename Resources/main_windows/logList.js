@@ -507,7 +507,7 @@ function pad2(number) {
 // put a spinner activity indicator in the cell while loading.
 
 function addMapRow (logData) {
-    Ti.API.info('In addMapRow()');
+    //Ti.API.info('In addMapRow()');
     
     var mapHeight = 200;
 
@@ -515,7 +515,7 @@ function addMapRow (logData) {
     if(Ti.Platform.name == 'iPhone OS'){
         row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.NONE;
     }
-    Ti.API.info('Created row container');
+    //Ti.API.info('Created row container');
 
 
     // Create the annotations
@@ -529,7 +529,7 @@ function addMapRow (logData) {
         //leftButton: '../images/appcelerator_small.png',
         myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
     });
-    Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
+    //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
     var lastPoint = Titanium.Map.createAnnotation({
         latitude:logData.last.lat,
@@ -541,7 +541,7 @@ function addMapRow (logData) {
         //leftButton: '../images/appcelerator_small.png',
         myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
     });
-    Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
+    //Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
 
     // now, create all the other annotations.
     var dataPoints = [];
@@ -567,7 +567,7 @@ function addMapRow (logData) {
         });
         dataPoints.push(point);
     };
-    Ti.API.info('Created anntations');
+    //Ti.API.info('Created anntations');
 
     var map = Ti.Map.createView({
         width:300,height:mapHeight,
@@ -577,11 +577,11 @@ function addMapRow (logData) {
         touchEnabled:false,
         annotations: [firstPoint,lastPoint]
     });
-    Ti.API.info('Created map view');
+    //Ti.API.info('Created map view');
 
     map.userLocation = false;
     //map.annotations = [firstPoint,lastPoint];
-    Ti.API.info('Added annotations to the map');
+    //Ti.API.info('Added annotations to the map');
 
     // region
     // to get the region, look for the extents?
@@ -613,7 +613,7 @@ function addMapRow (logData) {
                          lat:parseFloat(p1.lat) + (p2.lat - p1.lat)/2 };
         var delta = { lon: Math.max(0.01,Math.abs(p2.lon - p1.lon)),
                       lat: Math.max(0.01,Math.abs(p2.lat - p1.lat)) };
-        Ti.API.info('Got the region: '+ JSON.stringify(midpoint) +', '+JSON.stringify(delta));
+        //Ti.API.info('Got the region: '+ JSON.stringify(midpoint) +', '+JSON.stringify(delta));
 
         var region = {  latitude: midpoint.lat,
                         longitude: midpoint.lon,
@@ -626,7 +626,7 @@ function addMapRow (logData) {
         map.regionFit = true;
     }
 
-    Ti.API.info('Set the map region');
+    //Ti.API.info('Set the map region');
 
     row.add(map);
 
@@ -640,7 +640,7 @@ function addMapRow (logData) {
     // TODO: add event listener for click to display the fullscreen map
     // TODO: use logData to center the map on the bounds of the start / end locations of the ride
     detailButton.addEventListener('click',function(e){
-        Ti.API.info('In the map row click event');
+        //Ti.API.info('In the map row click event');
         var mapwin = Ti.UI.createWindow({
             barColor:orangeColor,
             title:'Samples'
@@ -658,7 +658,7 @@ function addMapRow (logData) {
         bigMap.annotations = dataPoints;
 
         mapwin.add(bigMap);
-        Ti.API.info('added the map view to the new map window');
+        //Ti.API.info('added the map view to the new map window');
 
         mapwin.addEventListener('close',function(e){
             // remove the mapview
@@ -666,14 +666,14 @@ function addMapRow (logData) {
         });
 
         Titanium.UI.currentTab.open(mapwin,{animated:true});
-        Ti.API.info('Should have opened the map window');
+        //Ti.API.info('Should have opened the map window');
     });
     
     row.add(detailButton); 
 
     row.className = 'maprow';
 
-    Ti.API.info('Returning map row');
+    //Ti.API.info('Returning map row');
     return row;
 }
 
@@ -709,7 +709,7 @@ function addSummaryRow (label,value) {
 
     row.className = 'summaryrow';
 
-    Ti.API.info('Returning a summary row for: '+label);
+    //Ti.API.info('Returning a summary row for: '+label);
     return row;
 }
 
@@ -850,7 +850,7 @@ function displayDetail(rowData) {
     //TODO: should this display the options dialog?
     sendButton.addEventListener('click',function(){
         // just testing
-        win.uploadProgress(newwin);
+        //win.uploadProgress(newwin);
         
         Ti.API.info('Send button pressed. isExporting == '+isExporting);
         
@@ -1010,12 +1010,12 @@ function displayDetail(rowData) {
 
 function addLogRow(rowData) // should include title(date), duration, distance, eventID/logID (for detail view) 
 {
-    Ti.API.info('In the addLogRow() method');
+    //Ti.API.info('In the addLogRow() method');
     
     if(rowData == null) { return null; }
 
 	var row = Ti.UI.createTableViewRow({height:55});
-    Ti.API.info('Created a new row object');
+    //Ti.API.info('Created a new row object');
 
     // add a label to the left
     // should be bold
@@ -1026,7 +1026,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         height:21
     });
     row.add(cellLabel);
-    Ti.API.info('Created (and added) the title to the row');
+    //Ti.API.info('Created (and added) the title to the row');
 
     // create a label for the subtitle
     // duration is millis
@@ -1034,13 +1034,13 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     var min = Math.floor(rowData.duration / 1000 / 60) % 60;
     var sec = Math.floor(rowData.duration / 1000) % 60;
     var durationString = (hour > 0 ? hour +':' : '') + (hour > 0 ? pad2(min) : min) +':'+ pad2(sec);
-    Ti.API.info('Created the durationString: '+durationString);
+    //Ti.API.info('Created the durationString: '+durationString);
 
     // distance / average
     var avgSpeedString;
     var distanceString; 
      if(Ti.App.Properties.getBool('useMetric',false)) {
-        Ti.API.info('Metric units');
+        //Ti.API.info('Metric units');
         var distanceUnits = "KM";
         var speedUnits = 'KPH';
 
@@ -1053,7 +1053,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
         avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
     } else {
-        Ti.API.info('Imperial units');
+        //Ti.API.info('Imperial units');
         var distanceUnitsImperial = "Miles";
         var speedUnitsImperial = 'MPH';
 
@@ -1065,7 +1065,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValueImperial;
         avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnitsImperial;
    }
-   Ti.API.info('Created the distanceString: '+distanceString);
+   //Ti.API.info('Created the distanceString: '+distanceString);
 
     // combine the two to create the subtitle label
     // smaller and grey
@@ -1076,7 +1076,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         left:10,top:23
     });
     row.add(subtitleLabel);
-    Ti.API.info('Created (and added) the subtitle label to the row');
+    //Ti.API.info('Created (and added) the subtitle label to the row');
 
     // add these strings to the row object for easy retrieval in the detail view
     row.distanceString = distanceString;
@@ -1117,7 +1117,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 //        row.selectionStyle = Ti.UI.iPhone.TableViewCellSelectionStyle.DEFAULT
     });
 
-    Ti.API.info('Finished setting up the row. Now returning it');
+    //Ti.API.info('Finished setting up the row. Now returning it');
     return row;
 }
 
@@ -1175,11 +1175,11 @@ function loadLogs () {
 
             // look up the eventid in the selectedEvents array.
             if(previousSelection.indexOf(rowParams.eventID) >= 0) {
-                Ti.API.info('Found previously selected event');
+                //Ti.API.info('Found previously selected event');
                 rowParams.hasCheck = true;
                 selectedEvents.push(rowParams.eventID); // restore this selection
             } else {
-                Ti.API.info('Found unselected event');
+                //Ti.API.info('Found unselected event');
                 //rowParams.hasDetail = true;
             }
 
