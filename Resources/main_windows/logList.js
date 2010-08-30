@@ -32,6 +32,9 @@ Ti.include('../tools/date.format.js');
 Ti.include('../tools/util.js');
 
 var win = Ti.UI.currentWindow;
+var detailWindow;
+
+var imagesPath = Titanium.Filesystem.resourcesDirectory + '/images/';
 
 // add an activity indicator 
 // use this for slow loading stuff.
@@ -188,8 +191,11 @@ function sendLog(params){
         // TODO: would like to include a progress bar here:
         try {
             Ti.API.info('about to start a bulk upload');
-            bulkUpload(tmpData);
-            Ti.API.info('just sent a bulk upload');
+
+            var manager = new uploadManager(detailWindow);
+            manager.bulkUpload(tmpData);
+
+            Ti.API.info('just started a bulk upload');
         } catch(err) {
             Ti.API.info('There was an error with bulkUpload()');
             var alertDialog = Titanium.UI.createAlertDialog({
@@ -632,7 +638,7 @@ function addMapRow (logData) {
 
     // add a detail disclosure button
     var detailButton = Ti.UI.createButton({
-        backgroundImage:'../detail.png',
+        backgroundImage: imagesPath+'detail.png',
         right:10,bottom:10,
         width:29,height:29
     });
@@ -815,19 +821,18 @@ function deleteEvent(params) {
     }
 };
 
-
 function displayDetail(rowData) { 
-    var newwin = Titanium.UI.createWindow({
+    detailWindow = Titanium.UI.createWindow({
         title:'Log Summary',
         backgroundColor:'#ccc',
         barColor:orangeColor
     });
 
     // set a custom property to be able to identify this as a detail window
-    newwin.isDetailWindow = true;
+    detailWindow.isDetailWindow = true;
 
     // still trying to eliminate the double detail page
-    newwin.addEventListener('close',function(){ detailPageCount--; });
+    detailWindow.addEventListener('close',function(){ detailPageCount--; });
             
     // add a send action button
     var sendButton = Titanium.UI.createButton();
@@ -836,12 +841,12 @@ function displayDetail(rowData) {
         //sendButton.systemButton =Titanium.UI.iPhone.SystemButton.ACTION;    
         sendButton.width = 43;
         sendButton.height = 30;
-        sendButton.backgroundImage = '../images/up_btn.png';
-        sendButton.backgroundDisabledImage = '../images/up_btn_disabled.png';
-        sendButton.backgroundSelectedImage = '../images/up_btn_selected.png';
+        sendButton.backgroundImage = imagesPath +'up_btn.png';
+        sendButton.backgroundDisabledImage = imagesPath +'up_btn_disabled.png';
+        sendButton.backgroundSelectedImage = imagesPath +'up_btn_selected.png';
         //sendButton.selectedColor = '#000';
         //sendButton.title = 'Send';
-        newwin.rightNavButton = sendButton;
+        detailWindow.rightNavButton = sendButton;
     } else {
         sendButton.title = 'Send';
         // TODO: figure out a solution for android
@@ -850,7 +855,7 @@ function displayDetail(rowData) {
     //TODO: should this display the options dialog?
     sendButton.addEventListener('click',function(){
         // just testing
-        //win.uploadProgress(newwin);
+        //win.uploadProgress(detailWindow);
         
         Ti.API.info('Send button pressed. isExporting == '+isExporting);
         
@@ -979,12 +984,12 @@ function displayDetail(rowData) {
         font:{fontSize:20,fontWeight:'bold'},
         height:45,
         width:300,
-        backgroundImage:'../images/button_red-150x45.png',
+        backgroundImage:imagesPath + 'button_red-150x45.png',
         borderRadius:10
     });
     deleteButton.addEventListener('click',function() {
         Ti.API.info('Delete button (detail view) clicked for eventID: '+rowData.eventID);
-        deleteEvent({eventid:rowData.eventID,closeWindow:newwin}); // second arg to close the current window
+        deleteEvent({eventid:rowData.eventID,closeWindow:detailWindow}); // second arg to close the current window
         //Ti.API.info('Event should have been deleted');
     });
 
@@ -996,9 +1001,9 @@ function displayDetail(rowData) {
     summaryTable.setData(summaryData);
     Ti.API.info('Created summaryTable and added summary data rows');
     
-    newwin.add(summaryTable);
+    detailWindow.add(summaryTable);
 
-    Titanium.UI.currentTab.open(newwin,{animated:true});
+    Titanium.UI.currentTab.open(detailWindow,{animated:true});
 
     // hide the activity indicator
     rowData.actInd.hide();
