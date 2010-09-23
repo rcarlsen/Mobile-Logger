@@ -193,7 +193,8 @@ function sendLog(params){
             Ti.API.info('about to start a bulk upload');
 
             var manager = new uploadManager(detailWindow);
-            manager.bulkUpload(tmpData);
+            //manager.bulkUpload(tmpData);
+            manager.bulkUploadBatch(tmpData);
 
             Ti.API.info('just started a bulk upload');
         } catch(err) {

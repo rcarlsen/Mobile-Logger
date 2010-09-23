@@ -155,7 +155,8 @@ function bulkUpload (samples) {
     {
         Ti.UI.currentWindow.fireEvent('uploadProgress',{value:-1});
 
-        Ti.API.info('Upload error: '+e.responseText);
+        Ti.API.info('Upload error: '+JSON.stringify(e));
+        //Ti.API.info('Upload error: '+e.responseText);
         return e.responseText;
     };
 
@@ -189,15 +190,17 @@ function uploadManager(win) {
 
         my._xhr.onload = function(e)
         {
+            Ti.API.info('Upload success: '+my._xhr.status);
             return e.responseText;
         };
 
         my._xhr.onerror = function(e)
         {
-            my.uploadProgress({value:-1});
+            my.uploadProgress({status:-1});
 
-            Ti.API.info('Upload error: '+e.responseText);
-            return e.responseText;
+            //Ti.API.info('Upload status: '+ my._xhr.status +' error: '+my._xhr.responseText);
+            Ti.API.info('Upload status: '+ JSON.stringify(e));
+            return my._xhr.responseText;
         };
 
         my._xhr.onsendstream = function(e)
@@ -206,24 +209,93 @@ function uploadManager(win) {
         };
 
         var out = {docs:_data};
+        my._xhr.setTimeout = 120000; // try 2 minutes.
         my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
         my._xhr.send("data="+JSON.stringify(out));
     };
 
+    var progress;
     this.cancelUpload = function() {
+        my.uploadProgress({status:-2}); // cancel message
         my._xhr.abort();
         Ti.API.info('Cancelling xhr request');
+        progress = null;
+    };
+
+    this.bulkUploadBatch = function(samples) {
+        if(samples == null || samples.length == 0) { return; }
+        
+        var range = {index: 0, length: 300};
+        if(range.length > samples.length) {range.length = samples.length;}
+
+        // start the progress meter
+        if(progress == null) {
+            progress = samples.length;
+
+            Ti.API.info('About to tell app to create a new progress bar');
+            my.uploadProgress({value:0});
+        }
+
+        my._xhr.onload = function(e)
+        {
+            var pmeter = 1-((samples.length-range.length)/progress);
+            Ti.API.info('Upload progress in bulkUploadBatch(): '+pmeter);
+
+            my.uploadProgress({value:pmeter});
+
+            if(samples.length > range.length) {
+                my.bulkUploadBatch(samples.slice(range.length-1));
+            }
+            else {
+                // done with the upload
+                my.uploadProgress({value:1.0});
+                progress = null;
+            }
+
+            return e.responseText;
+        };
+        
+        my._xhr.onerror = function(e)
+        {
+            my.uploadProgress({status:-1});
+            progress = null;
+
+            Ti.API.info('Upload error: '+e.responseText);
+            return e.responseText;
+        };
+        
+        my._xhr.onsendstream = function(e)
+        {
+            Ti.API.info('sendstream progress: '+e.progress);
+
+            var pmeter = 1-((samples.length-(e.progress*range.length))/progress);
+            Ti.API.info('sendstream progress: '+pmeter);
+            my.uploadProgress({value:pmeter});
+        };
+        
+        var out = {docs:samples.slice(range.index,range.length)};
+
+        my._xhr.setTimeout = 20000;
+        my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
+        my._xhr.send("data="+JSON.stringify(out));
     };
 
 
     this.progressView = null;
     this.progressBar = null;
+    this.progressActive = false;
     this.uploadProgress = function(o)
     {
         // want this to display a progress bar
         // should also generate a view 
         if(o.window == null) { o.window = my._window; }
-        if(o.value == null) { o.value = 0; }
+        if(o.value == null) { 
+            if(my.progressBar)
+                { o.value = my.progressBar.value; }
+            else
+                { o.value = 0; }
+        }
+        if(o.status == null) { o.status = 0; }
 
         if(my.progressView == null) {
             // create a view...then add the bar to it.
@@ -232,20 +304,21 @@ function uploadManager(win) {
             my.progressView = Ti.UI.createView({
                 top:0,
                 width:320, // TODO: adjust this to fit the window
-                height:50,
+                height:55,
                 backgroundColor:'#666',
                 opacity:0
             });
 
             Ti.API.info('Creating the upload progress bar');
             my.progressBar = Titanium.UI.createProgressBar({
+                top:-3,
                 width:260,
                 left: 10,
                 min:0,
                 max:1,
                 value:0,
                 color:'#fff',
-                message:'Upload progress',
+                message:'Uploading data',
                 font:{fontSize:14, fontWeight:'bold'},
                 style:Titanium.UI.iPhone.ProgressBarStyle.PLAIN
             });
@@ -266,17 +339,26 @@ function uploadManager(win) {
             });
             
             my.progressView.add(closeBtn);
-
             my.progressView.add(my.progressBar);
             my.progressBar.show();
+
+            my.progressActive = true;
             o.window.add(my.progressView);
 
             my.progressView.animate({opacity:0.9,duration:250});
         }
         
 
-        if(o.value < 0) { // error condition
-             my.progressBar.message = 'Upload failed';
+        if(my.progressActive && o.status < 0) { // error condition
+            my.progressActive = false;
+
+            if(o.status == -1) {
+                 my.progressBar.message = 'Upload failed';
+             } else if(o.status == -2) {
+                 my.progressBar.message = 'Upload cancelled';
+             } else {
+                 my.progressBar.message = 'Upload error';
+             }
 
              setTimeout(function(){
                my.progressView.animate({opacity:0,duration:250},function() {
@@ -285,23 +367,26 @@ function uploadManager(win) {
                });
            },1500);
 
-            o.value = 0;
+            //o.value = 0;
         } 
         else {
             my.progressBar.value = o.value;
         }
         // if the progress is complete, automatically
         // dismiss the view after a few moments
-        if(o.value >= 1.0) {
-           Ti.API.info('About to fade the progress view');
-           my.progressBar.message = 'Upload finished';
+        if(my.progressActive && o.value >= 1.0) {
+            my.progressBar.value = 1.0;
+            my.progressActive = false;
 
-           setTimeout(function(){
+            Ti.API.info('About to fade the progress view');
+            my.progressBar.message = 'Upload finished';
+
+            setTimeout(function(){
                my.progressView.animate({opacity:0,duration:250},function() {
                    o.window.remove(my.progressView);
                    //progressView = null;
                });
-           },1000);
+            },1000);
         }
     };
 }
