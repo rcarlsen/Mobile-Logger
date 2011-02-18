@@ -24,6 +24,9 @@ Ti.include('main_windows/api.js');
 
 setupDatabase();
 
+// clear the Google session token:
+Ti.App.Properties.setString('googleClientLoginAuth','');
+
 Ti.Geolocation.purpose = "Log location, movement and sound.";
 
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)

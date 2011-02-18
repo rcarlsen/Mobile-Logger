@@ -75,6 +75,50 @@ function addControlRow(label,property,initialValue)
 }
 
 
+function addTextFieldRow(label,property,initialValue,secure)
+{
+    if(initialValue == null) { initialValue = ''; }
+    if(secure == null) { secure = false; }
+
+	var row = Ti.UI.createTableViewRow({height:50});
+    row.backgroundColor = '#fff';
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:16,fontWeight:'bold'},
+        left:10
+    });
+    row.add(cellLabel);
+
+    // enable the property to be omitted
+    // TODO: use a type variable to create different styles of controls?
+    if(property != null){
+        // add a textField
+        var field = Ti.UI.createTextField({
+            right:10,
+            left:110,
+            passwordMask:secure,
+            hintText:initialValue,
+            value:Ti.App.Properties.getString(property,initialValue)
+        });
+
+        // add a callback function to set application
+        // properties when the value is changed
+        field.addEventListener('blur', function(e)
+        {
+            // update the property with the state of the switch
+            Ti.App.Properties.setString(property,e.value);
+            Ti.API.info('Property changed: '+property+', '+e.value);
+        });
+        row.add(field);
+	}
+
+	row.className = 'textControl';
+	return row;
+}
+
 function addExportRow(label,property,valuesList,initialValue)
 {
     if(initialValue == null) { initialValue = false; }
@@ -327,13 +371,148 @@ function addExportDbRow(label)
     return row;
 }
 
+
+// add network row. mobile logger server or google fusion tables
+function addNetworkRow(label,property,valuesList,initialValue)
+{
+    if(initialValue == null) { initialValue = false; }
+
+	var row = Ti.UI.createTableViewRow({height:50});
+    row.backgroundColor = '#fff';
+
+    // add a label to the left
+    // should be bold
+    var cellLabel = Ti.UI.createLabel({
+        text:label,
+        font:{fontSize:16,fontWeight:'bold'},
+        left:10
+    });
+    row.add(cellLabel);
+
+    // enable the property to be omitted
+    // TODO: use a type variable to create different styles of controls?
+    if(property != null){
+        row.hasChild = true;
+        row.value = Ti.App.Properties.getString(property,initialValue);
+
+        var cellValue = Ti.UI.createLabel({
+            text:valuesList[row.value],
+            font:{fontSize:12},
+            textAlign:'right',
+            right:20
+        });
+        row.add(cellValue);
+
+        // add an event listener to this row
+        row.addEventListener('click',function(e){
+            // push a table view with these valuesList
+           Ti.API.info('In the network row click event');
+
+            var exportWin = Ti.UI.createWindow({
+                title:'Select service',
+                backgroundColor: '#ccc',
+                barColor:orangeColor
+            });
+
+            var thisTable = Ti.UI.createTableView();
+            thisTable.style = Ti.UI.iPhone.TableViewStyle.GROUPED;
+            thisTable.backgroundColor = '#ccc';
+            var data = [];
+            for(var i in valuesList) {
+                if(valuesList.hasOwnProperty(i)){
+                    var thisRow = Ti.UI.createTableViewRow({backgroundColor:'#fff'});
+                    thisRow.title = valuesList[i];
+                    thisRow.value = i;
+
+                    // check the currently selected export format
+                    if(row.value == thisRow.value) { thisRow.hasCheck = true; }
+                    data.push(thisRow);
+                    
+                    // add the authentication fields in a new window:
+                    if(i == 'fusionTables') {
+                        thisRow.hasDetail = true;
+                        
+                        thisRow.addEventListener('click',function(r){
+                           // only act when the detail disclosure is clicked, or if the account fields are empty
+                           if(r.detail ||
+                                (Ti.App.Properties.getString('googleUsername') == '' ||
+                                 Ti.App.Properties.getString('googlePassword') == '')) { 
+                                var acctWin = Ti.UI.createWindow({
+                                    title:'Google account',
+                                    backgroundColor: '#ccc',
+                                    barColor:orangeColor
+                                });
+                                var acctTable = Ti.UI.createTableView();
+                                acctTable.style = Ti.UI.iPhone.TableViewStyle.GROUPED;
+                                acctTable.backgroundColor = '#ccc';
+                                var acctData = [];
+
+                                var nameRow = addTextFieldRow('Username','googleUsername','Google username');
+                                var passRow = addTextFieldRow('Password','googlePassword','Google password',true);
+                                passRow.footer = 'Provide Google Account information';
+
+                                acctData.push(nameRow);
+                                acctData.push(passRow);
+
+                                acctTable.setData(acctData);
+
+                                // TODO: add click listener to this table
+                                acctWin.add(acctTable);
+                                Titanium.UI.currentTab.open(acctWin,{animated:true});
+                            }
+                        });
+                    }
+                }
+            }
+            thisTable.setData(data);
+
+            thisTable.addEventListener('click',function(r){
+                Ti.API.info('In the select network service window click event');
+                var rowValue = r.rowData.value;
+
+                // trying to get the parentTable to update.
+                cellValue.text = r.rowData.title;
+                row.value = rowValue;
+
+                Ti.App.Properties.setString(property,rowValue);
+                Ti.API.info('Set the property: '+property +' to: '+rowValue);
+
+                // deselect all rows in the table
+                var index = r.index;
+                var section = r.section;
+
+                setTimeout(function()
+                {
+                    // reset checks
+                    for (var i=0;i<section.rows.length;i++) {
+                        section.rows[i].hasCheck = false;
+                    }
+                    // set current check
+                    section.rows[index].hasCheck = true;
+                },250);
+            });
+
+            exportWin.add(thisTable);
+            Ti.API.info('Added server table to service window');
+
+            Titanium.UI.currentTab.open(exportWin,{animated:true});
+            Ti.API.info('Select service window should have opened');
+        });
+	}
+
+	row.className = 'networkRow';
+	return row;
+}
+
 // set up the settings table rows:
 var inputData = [];
 
+var networkServiceRow = addNetworkRow('Upload Service','uploadService',{fusionTables:'Google Fusion Tables',mobileLogger:'Mobile Logger'},'mobileLogger');
 var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
-//networkRow.header = 'Network';
-networkRow.footer = 'Send data to the Mobile Logger server';
+networkRow.footer = 'Send data to a network service';
+inputData.push(networkServiceRow);
 inputData.push(networkRow);
+
 //inputData.push(addControlRow('Server'));
 //inputData.push(addControlRow('Database'));
 
