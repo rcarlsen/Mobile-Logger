@@ -719,6 +719,9 @@ function startLogging(restore) {
     // disable the idle timer while logging
     Ti.App.idleTimerDisabled = true;
 
+    // enable proximity sensor to dim the display:
+    Ti.App.proximityDetection = true;
+
     Ti.API.info("Finished the startLogging() method");
 
     return true;
@@ -750,6 +753,9 @@ function stopLogging() {
 
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
+    
+    // enable proximity sensor to dim the display:
+    Ti.App.proximityDetection = false;
 };
 
 
