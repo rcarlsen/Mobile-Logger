@@ -194,7 +194,25 @@ function sendLog(params){
 
             var manager = new uploadManager(detailWindow);
             //manager.bulkUpload(tmpData);
-            manager.bulkUploadBatch(tmpData);
+            
+            // if using fusion tables, test creating a new table id:
+            if (Ti.App.Properties.getString('uploadService') == 'fusionTables') {
+                var metaStuff = {
+                    'description':'Mobile Logger Data',
+                    'startdate':startDate.getTime(),
+                    'eventID':selectedEventID,
+                    'samples':tmpData
+                    };
+                makeFusionTablesMetaRequest(packageFusionTablesMetaData(metaStuff));
+
+                if(Ti.App.Properties.getBool('googleFusionCreateNewTables',false)) {
+                    var tableName = 'Mobile Logger: '+startDate.format('yyyy-mm-dd_HH-MM-ss_Z');
+                    manager.createNewTable(tableName,function() {manager.bulkUploadBatch(tmpData);});
+                }
+                else {
+                    manager.bulkUploadBatch(tmpData);
+                }
+            }
 
             Ti.API.info('just started a bulk upload');
         } catch(err) {

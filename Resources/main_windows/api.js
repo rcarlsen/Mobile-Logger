@@ -135,6 +135,278 @@ function bulkUploadBatch (samples) {
 }
 */
 
+function makeGoogleFusionAuthRequest(callback) {
+    // make an auth request:
+    var authXhr = Ti.Network.createHTTPClient();
+    authXhr.onerror = function(e) {
+        Ti.API.info("auth error: "+e.responseText);
+    };
+
+    authXhr.onload = function(e) {
+        //Ti.API.info("auth xhr finished: "+authXhr.responseText);
+        
+        var statusCode = authXhr.status;
+        if(statusCode == 200) {
+            // success, store the token and make the real call:
+            var tokens = authXhr.responseText.split("\n");
+            for (var c=0;c<tokens.length;c++)
+            {
+                var token = tokens[c];
+                var kv = token.split("=");
+                if (kv[0]=='Auth') {
+                    var authHeader = "GoogleLogin auth="+kv[1];
+                    Ti.App.Properties.setString('googleClientLoginAuth',authHeader);
+                    Ti.API.info("wrote auth header to properties: "+authHeader);
+
+                    // Finally got a valid token, now make the actual request:
+                    if (callback != null && callback.hasOwnProperty('makeRequest')) {
+                        callback.makeRequest();
+                    }
+                    break;
+                }
+            }
+        }
+        else {
+            // there was an error
+            // TODO: alert the user
+            Ti.API.info("There was an auth request error: "+authXhr.responseText);
+            
+            // clear the previous session auth header:
+            Ti.App.Properties.setString('googleClientLoginAuth','');
+        }
+    };
+
+    var payload = [
+        "Email="+Ti.App.Properties.getString('googleUsername'),
+        "Passwd="+Ti.App.Properties.getString('googlePassword'),
+        "service="+"fusiontables",
+        "source=MobileLogger"
+    ];
+
+    authXhr.open("POST","https://www.google.com/accounts/ClientLogin");
+    authXhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    
+    var payloadString = payload.join('&');
+    //Ti.API.info(payloadString);
+    authXhr.send(payloadString);
+}
+
+
+function createFusionTable(tableName, callback) {
+    if(tableName == null || tableName == '') {
+        tableName = "Mobile Logger";
+    }
+
+    // create a new table and reture the table id?
+    // store it in the properties?
+    //
+    // syntax:
+    // sql=CREATE TABLE SaleInformation (customer: NUMBER, memo: STRING, 'sale location': LOCATION, 'time of sale': DATETIME)
+
+    var my = this;
+    this._xhr = Titanium.Network.createHTTPClient();
+    
+    my._xhr.onload = function(e)
+    {
+        Ti.API.info('Create table success: '+my._xhr.responseText);
+
+        // this is where we should get the tableid.
+        var r = my._xhr.responseText.split('\n');
+        if(r.length > 1) {
+            var tableID = r[1];
+            if(!isNaN(tableID)) { 
+                Ti.App.Properties.setInt('googleFusionTableID',tableID);
+                Ti.API.info('just set the fusion table id to: ' +tableID);
+
+                if(callback != null) {
+                    // kick off the upload
+                    callback();
+                }
+            }
+        }
+        
+        return my._xhr.responseText;
+    };
+
+    my._xhr.onerror = function(e)
+    {
+        Ti.API.info('Create table status: '+ my._xhr.status +' error: '+my._xhr.responseText);
+        return my._xhr.responseText;
+    };
+
+
+    this.makeRequest = function() {
+         var headers = [
+         'logID: STRING',
+         'accx: NUMBER',
+         'accy: NUMBER',
+         'accz: NUMBER',
+         'mag: NUMBER',
+         'lat: LOCATION',
+         'lon: NUMBER',
+         'alt: NUMBER',
+         'locAcc: NUMBER',
+         'altAcc: NUMBER',
+         'speed: NUMBER',
+         'timestamp: DATETIME',
+         'heading: NUMBER',
+         'eventID: STRING',
+         'deviceID: STRING',
+         'dbfs: NUMBER', 
+         'dbspl: NUMBER' //,
+         //'LATLON: LOCATION'
+         ];
+
+        var sqlQuery="sql="+encodeURIComponent("CREATE TABLE '"+tableName+"' ("+headers.join(', ')+")");
+        Ti.API.info(sqlQuery);
+        
+        my._xhr.open("POST","https://www.google.com/fusiontables/api/query");
+        my._xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        my._xhr.setRequestHeader('Authorization',Ti.App.Properties.getString('googleClientLoginAuth'));
+
+        my._xhr.send(sqlQuery);
+    };
+
+    if(Ti.App.Properties.getString('googleClientLoginAuth') == '') {
+        makeGoogleFusionAuthRequest(this);
+    }
+    else {
+        my.makeRequest();
+    }
+}
+
+
+function packageFusionTablesRequest(samples) {
+    if(samples == null || samples.length == 0) { return; }
+
+    // test table id:
+    var tableID = Ti.App.Properties.getInt('googleFusionTableID',456504); // this default is the sandbox, public table.
+ 
+    // build the insert sql statement
+    var statements = [];
+    
+
+    var headers = ['logID', 'accx', 'accy', 'accz', 'mag', 'lat', 'lon', 'alt', 'locAcc', 'altAcc', 'speed', 'timestamp', 'heading', 'eventID', 'deviceID','dbfs', 'dbspl'];//,'LATLON'];
+    var rows = [];
+    for (var i = 0; i < samples.length; i++) {
+      var thisRow = []; for(var h in headers) {thisRow.push("''");} // this feels dirty, but want to ensure that all rows have values.
+
+      for(var datum in samples[i]) {
+          if(samples[i].hasOwnProperty(datum)) {
+                if(datum == '_id') { continue; }
+
+                // add this data type to the index
+                var index = headers.indexOf(datum);
+                if(index == -1){
+                    headers.push(datum);
+                    index = headers.indexOf(datum);
+                }
+
+                // respect the user preference to omit the device ID
+                if(datum == 'deviceID' && Ti.App.Properties.getBool('omitDeviceID',false)) {
+                    thisRow[index] = -1;
+                } else {
+                    // wrap strings in single quotes:
+                    if(isNaN(samples[i][datum])) {
+                        thisRow[index] = "'"+samples[i][datum]+"'";
+                    }
+                    else {
+                        thisRow[index] = samples[i][datum];
+                    }
+                }
+          }
+      }
+    
+      // // construct the location column
+      // thisRow[headers.indexOf('LATLON')] = samples[i].lat +','+ samples[i].lon;
+
+      // add this row to the output
+      rows.push(thisRow.join(', '));  
+    }
+    //Ti.API.info(rows);
+
+    for(var r=0; r<rows.length; r++) {
+        statements.push("INSERT INTO "+tableID+" ("+headers.join(', ')+") VALUES ("+rows[r]+")");
+    }
+
+    return statements;
+}
+
+
+function packageFusionTablesMetaData(_data) {
+    // expects an object from the Meta table.
+    if(_data == null || _data.length == 0) { return; }
+
+    // test table id:
+    var tableID = Ti.App.Properties.getInt('googleFusionTableIndexID',482710); // this default is the sandbox, public table.
+ 
+    // description, startdate, eventID, route (kml LineString)
+    // <LineString>
+    // <coordinates> lng,lat[,alt] lng,lat[,alt] ... </coordinates>
+    // </LineString>
+    // 
+    var routeData = [];
+    for (var i = 0; i < _data.samples.length; i++) {
+        var sample = _data.samples[i];
+        var thisData = [];
+        if(sample.hasOwnProperty('lat') && sample.hasOwnProperty('lon')) {
+            thisData.push(sample.lon);
+            thisData.push(sample.lat);
+        }
+        if(sample.hasOwnProperty('alt')) { thisData.push(sample.alt); }
+
+        routeData.push(thisData.join(','));
+    }
+
+    var kmlString = '<LineString><coordinates> '+routeData.join(' ')+' </coordinates></LineString>';
+    var statement = 'INSERT INTO '+tableID+" ( description, startdate, eventID, route ) VALUES ( '"+_data.description+"', "+_data.startdate+", '"+_data.eventID+"', '"+kmlString+"' )";
+    
+    //Ti.API.info(statement);
+
+    return statement;
+}
+
+function makeFusionTablesMetaRequest(_sql, callback) {
+    var my = this;
+    this._xhr = Titanium.Network.createHTTPClient();
+    
+    my._xhr.onload = function(e)
+    {
+        Ti.API.info('Send meta data success: '+my._xhr.responseText);
+        if(callback != null) {
+            callback();
+        }
+        
+        return my._xhr.responseText;
+    };
+
+    my._xhr.onerror = function(e)
+    {
+        Ti.API.info('Send meta data status: '+ my._xhr.status +' error: '+my._xhr.responseText);
+        return my._xhr.responseText;
+    };
+
+    this.makeRequest = function() {
+        var sqlQuery="sql="+encodeURIComponent(_sql);
+        //Ti.API.info(sqlQuery);
+        
+        my._xhr.open("POST","https://www.google.com/fusiontables/api/query",false); // #dev synchronous request here
+        my._xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        my._xhr.setRequestHeader('Authorization',Ti.App.Properties.getString('googleClientLoginAuth'));
+
+        my._xhr.send(sqlQuery);
+    };
+
+    if(Ti.App.Properties.getString('googleClientLoginAuth') == '') {
+        makeGoogleFusionAuthRequest(this);
+    }
+    else {
+        my.makeRequest();
+    }
+
+}
+
+
 var cancel;
 function bulkUpload (samples) {
     if(samples == null || samples.length == 0) { return; }
@@ -177,46 +449,7 @@ function bulkUpload (samples) {
 
     // testing google fusion tables
     if (Ti.App.properties.getString('uploadService') == 'fusionTables') {
-        // test table id:
-        var tableID = 456504;
-     
-        // build the insert sql statement
-        var statements = [];
-        
-
-        var headers = ['logID', 'accx', 'accy', 'accz', 'mag', 'lat', 'lon', 'alt', 'locAcc', 'altAcc', 'speed', 'timestamp', 'heading', 'eventID', 'deviceID','dbfs', 'dbspl'];
-        var rows = [];
-        for (var i = 0; i < samples.length; i++) {
-          var thisRow = []; for(var h in headers) {thisRow.push("''");} // this feels dirty, but want to ensure that all rows have values.
-
-          for(var datum in samples[i]) {
-              if(samples[i].hasOwnProperty(datum)) {
-                    if(datum == '_id') { continue; }
-
-                    // add this data type to the index
-                    var index = headers.indexOf(datum);
-                    if(index == -1){
-                        headers.push(datum);
-                        index = headers.indexOf(datum);
-                    }
-
-                    // respect the user preference to omit the device ID
-                    if(datum == 'deviceID' && Ti.App.Properties.getBool('omitDeviceID',false)) {
-                        thisRow[index] = -1;
-                    } else {
-                        thisRow[index] = "'"+samples[i][datum]+"'";
-                    }
-              }
-          }
-          // add this row to the output
-          rows.push(thisRow.join(', '));  
-        }
-        //Ti.API.info(rows);
-
-        for(var r=0; r<rows.length; r++) {
-            statements.push("INSERT INTO "+tableID+" ("+headers.join(', ')+") VALUES ("+rows[r]+")");
-        }
-
+        var statements = packageFusionTablesRequest(samples); 
 
         // check for an auth token:
         var auth = Ti.App.Properties.getString('googleClientLoginAuth','');
@@ -258,12 +491,11 @@ function bulkUpload (samples) {
                             Ti.App.Properties.setString('googleClientLoginAuth',authHeader);
                             Ti.API.info("wrote auth header to properties: "+authHeader);
 
+                            // Finally got a valid token, now make the actual request:
                             makeRequest();                       
                             break;
                         }
                     }
-                        
-
                 }
                 else {
                     // there was an error
@@ -308,12 +540,18 @@ function bulkUpload (samples) {
 
 
 
+
 function uploadManager(win) {
     Ti.API.info('In the uploadManager constructor');
 
     this._xhr = Titanium.Network.createHTTPClient();
     this._window = win;
     var my = this;
+
+    // expose a way to make a new table:
+    this.createNewTable = function(_tableName, _callback) {
+        createFusionTable(_tableName, _callback);
+    };
 
     this.bulkUpload = function(_data) {
         if(_data == null || _data.length == 0) { return; }
@@ -406,12 +644,41 @@ function uploadManager(win) {
             Ti.API.info('sendstream progress: '+pmeter);
             my.uploadProgress({value:pmeter});
         };
-        
-        var out = {docs:samples.slice(range.index,range.length)};
+       
+        // done setting up the xhr request parameters.
+        //
+            
+        // google fusion tables:
+        if (Ti.App.properties.getString('uploadService') == 'fusionTables') {
+            var statements = packageFusionTablesRequest(samples.slice(range.index,range.length)); 
 
-        my._xhr.setTimeout = 20000;
-        my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
-        my._xhr.send("data="+JSON.stringify(out));
+            this.makeRequest = function() {
+                var sqlQuery="sql="+encodeURIComponent(statements.join(';'));
+                //Ti.API.info(sqlQuery);
+                
+                my._xhr.open("POST","https://www.google.com/fusiontables/api/query");
+                my._xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+                my._xhr.setRequestHeader('Authorization',Ti.App.Properties.getString('googleClientLoginAuth'));
+
+                my._xhr.send(sqlQuery);
+            };
+
+            if(Ti.App.Properties.getString('googleClientLoginAuth') == '') {
+                makeGoogleFusionAuthRequest(this);
+            }
+            else {
+                my.makeRequest();
+            }
+
+        }
+        else {
+            // mobile logger server:
+            var out = {docs:samples.slice(range.index,range.length)};
+
+            my._xhr.setTimeout = 20000;
+            my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
+            my._xhr.send("data="+JSON.stringify(out));
+        }
     };
 
 

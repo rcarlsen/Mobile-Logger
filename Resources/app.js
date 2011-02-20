@@ -27,6 +27,9 @@ setupDatabase();
 // clear the Google session token:
 Ti.App.Properties.setString('googleClientLoginAuth','');
 
+// #dev only. clear the table, it will fallback on the dev table.
+Ti.App.Properties.removeProperty('googleFusionTableID');
+
 Ti.Geolocation.purpose = "Log location, movement and sound.";
 
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)
