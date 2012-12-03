@@ -559,9 +559,9 @@ function addMapRow (logData) {
         var speedString;
         if(Ti.App.Properties.getBool('useMetric',false)) {
             // using Math.max() to filter out the -1 values from bad speed readings
-            speedString = toKPH(Math.max(0,d.speed)).toFixed(2) +' KPH';
+            speedString = toKPH(Math.max(0,d.speed)).toFixed(2) +' km/h';
         }else{
-            speedString = toMPH(Math.max(0,d.speed)).toFixed(2) + ' MPH';
+            speedString = toMPH(Math.max(0,d.speed)).toFixed(2) + ' mph';
         }
         var point = Ti.Map.createAnnotation({
             latitude:d.lat,
@@ -1047,8 +1047,8 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
     var distanceString; 
      if(Ti.App.Properties.getBool('useMetric',false)) {
         //Ti.API.info('Metric units');
-        var distanceUnits = "KM";
-        var speedUnits = 'KPH';
+        var distanceUnits = "km";
+        var speedUnits = 'km/h';
 
         var distanceUnitValue = 0.001; //m -> km
         var speedUnitValue = 3.6; // m/s -> M/hr
@@ -1060,8 +1060,8 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
     } else {
         //Ti.API.info('Imperial units');
-        var distanceUnitsImperial = "Miles";
-        var speedUnitsImperial = 'MPH';
+        var distanceUnitsImperial = "mi";
+        var speedUnitsImperial = 'mph';
 
         var distanceUnitValueImperial = 0.000621371192; // m -> mile
         var speedUnitValueImperial = 2.236936; // m/s -> M/hr

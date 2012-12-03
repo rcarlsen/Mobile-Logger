@@ -951,13 +951,13 @@ function setUnits () {
     // use inperial units by default
     if(Ti.App.Properties.getBool('useMetric',false)) {
         distanceUnits = "Kilometers";
-        speedUnits = 'KPH';
+        speedUnits = 'km/h';
 
         distanceUnitValue = 0.001; //m -> km
         speedUnitValue = 3.6; // m/s -> M/hr
     } else {
         distanceUnits = "Miles";
-        speedUnits = 'MPH';
+        speedUnits = 'mph';
 
         //1 meter = 0.000621371192 miles
         distanceUnitValue = 0.000621371192; // m -> mile
