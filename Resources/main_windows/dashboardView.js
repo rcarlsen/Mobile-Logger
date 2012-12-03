@@ -33,7 +33,7 @@ var win = Ti.UI.currentWindow;
 function setLoggingState(state) {
     // set the preferences
     // the application should *always* have the loggingState false
-    // when it launches. otherwise, it may ahve shut down incorrectly.
+    // when it launches. otherwise, it may have shut down incorrectly.
     // if so, perhaps we should prompt to resume logging.
     // however, if the auto-resume feature is set, what to do then?
     // should the auto-resume only activate in startLogging()?
@@ -159,6 +159,11 @@ var latLabel = Ti.UI.createLabel({
     top:30,left:10
 });
 
+// a container so the label positions will be laid out correctly
+var compassLabelsView = Ti.UI.createView({
+    width:200, height:200
+});
+
 var headingLabel = Ti.UI.createLabel({
     color:'#333',
    	font:{fontSize:28,fontFamily:'Helvetica Neue',fontWeight:'bold'},
@@ -194,16 +199,17 @@ var accuracyLabel = Ti.UI.createLabel({
     bottom:120
 });
 
+// this is cropping the accuracy view on iphone 5
+// the container view should fill the window, but then we'll need
+// to be able to reposition the compass / accuracy view within.
 var compassView = Ti.UI.createView({
-    width:320,height:200,
-    center:{x:160,y:170},
-    left:0,top:75
+    width:320,height:320,
+    center:{x:160,y:170}
 });
 
 var compass = Ti.UI.createImageView({
     image: '../images/small-compass-shadow.png',
-    width:200,height:200,
-    top:0
+    width:200,height:200
 });
 
 //compassView.borderWidth = 1;
@@ -278,8 +284,9 @@ var durationUnitLabel = Ti.UI.createLabel({
     color:'#333',
     font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
-durationUnitLabel.bottom = -15;
-durationLabel.add(durationUnitLabel);
+durationUnitLabel.bottom = 7;
+durationUnitLabel.left = 10;
+consoleImage.add(durationUnitLabel);
 consoleImage.add(durationLabel);
 
 // add a distance label
@@ -299,8 +306,9 @@ var distanceUnitLabel = Ti.UI.createLabel({
     color:'#333',
     font:{fontSize:14,fontFamily:'Helvetica Neue',fontWeight:'bold'}
 });
-distanceUnitLabel.bottom = -15;
-distanceLabel.add(distanceUnitLabel);
+distanceUnitLabel.bottom = 7;
+distanceUnitLabel.right = 10;
+consoleImage.add(distanceUnitLabel);
 consoleImage.add(distanceLabel);
 
 
@@ -864,15 +872,22 @@ loggingSwitch.addEventListener('change',function(e) {
 //dashboardView.add(accuracyLabel);
 dashboardView.add(accLabel);
 
+// initialize the labels.
+// core location takes some time to return an initial value
+// TODO: put this into some kind of initializer / fallback function
+lonLabel.text = "Locating...";
+latLabel.text = "";
 dashboardView.add(lonLabel);
 dashboardView.add(latLabel);
 
-compassView.add(speedlabel);
-compassView.add(speedUnitLabel);
+compassLabelsView.add(speedlabel);
+compassLabelsView.add(speedUnitLabel);
 
-compassView.add(headingLabel);
-//compassView.add(headingAccuracyLabel);
-compassView.add(cardinalLabel);
+compassLabelsView.add(headingLabel);
+//compassLabelsView.add(headingAccuracyLabel);
+compassLabelsView.add(cardinalLabel);
+
+compassView.add(compassLabelsView);
 
 dashboardView.add(compassView);
 dashboardView.add(consoleView);
@@ -901,6 +916,13 @@ var reminderLabel = Ti.UI.createLabel({
 });
 reminderLabel.hide();
 win.add(reminderLabel);
+
+
+// adjust compass center for iPhone 4/5
+function layoutAutoAdjustment() {
+    Ti.API.info("layout auto-adjustment");
+    compassView.setCenter({x:160,y:((win.size.height > 480) ? 220 : 170)});    
+};
 
 
 // toggle the dashboard view transparency
@@ -1297,7 +1319,9 @@ win.addEventListener('open',function() {
     // is this the first event to trigger?
     // if not, the setup needs to happen first.
     // maybe in app.js.
-    //Ti.API.info('In the window open event. About to setup DB.');
+    Ti.API.info('In the window open event.');
+    
+    layoutAutoAdjustment();
     
     // this is done in the app.js file now.
     //setupDatabase();
