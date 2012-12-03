@@ -1097,7 +1097,7 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
         text:durationString +' | '+distanceString,
         font:{fontSize:13},
         color:'#666',
-        left:10,top:23
+        left:10,bottom:7
     });
     row.add(subtitleLabel);
     //Ti.API.info('Created (and added) the subtitle label to the row');

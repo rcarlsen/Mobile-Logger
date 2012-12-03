@@ -254,9 +254,11 @@ function addAboutRow(label,value)
             //borderWidth:1,
             //borderColor:'#999',
             //borderRadius:10,
+            height:Ti.UI.FILL,
             editable:false,
-            touchEnabled:false,
-            font:{fontSize:15}
+            touchEnabled:true,
+            font:{fontSize:16},
+            scrollable:true
         });
         Ti.API.info('Created about field');
         //Ti.API.info('Added about string to about field: '+value);
