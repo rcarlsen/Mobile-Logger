@@ -406,6 +406,8 @@ function updateAccuracyView (meters) {
     // create an animation for the accuracy
     // scale? starts at 5k, usually 100-50m
     // map the meters to an appropriate scale
+    
+    if(accuracyView.getAnimating() == true) {return;}
 
     // set up some constraints
     var minMeters = 25;
@@ -417,9 +419,8 @@ function updateAccuracyView (meters) {
     var sc = (((meters-minMeters)/(maxMeters-minMeters)) * (maxPx-minPx) + minPx)/minPx;
 	var t = Titanium.UI.create2DMatrix();
 	t = t.scale(sc + 0.2);
-	accuracyView.animate({transform:t, duration:300},function()
-	{
-		var t = Titanium.UI.create2DMatrix();
+	accuracyView.animate({transform:t, duration:300},function() {
+	    var t = Titanium.UI.create2DMatrix();
         t = t.scale(sc);
 		accuracyView.animate({transform:t, duration:200});
 	});
@@ -601,22 +602,21 @@ function updateDistanceLabel (delta) {
     distanceLabel.text = parseFloat(displayDistance).toFixed(2);
 }
 
+var compassTransformation = Ti.UI.create2DMatrix();
 function rotateCompass(degrees) {
 	// don't interrupt the current animation
-    // if(compass.animating) { return; }
-    
-    var t = Ti.UI.create2DMatrix().rotate(360-parseFloat(degrees));
-    compass.transform = t;
-
-    // ignore the nice rotation for now, just get the compas to move correctly
-    /*
-    var a = Titanium.UI.createAnimation();
-	a.transform = t;
-	a.duration = 100;
-	a.autoreverse = false;
-	a.repeat = 0;
-	compass.animate(a); // TODO: rotate a compass widget instead
-    */
+	// TODO: figure out why this seems to be ignored.
+    if(compass.getAnimating() == false) { 
+        var t = compassTransformation;
+        t = t.rotate(360-degrees);
+        
+        var a = Titanium.UI.createAnimation({
+           transform:  t,
+           duration:   300
+        });
+        
+        compass.animate(a);
+	}
 }
 
 function updateLocationData(e) {
@@ -1043,9 +1043,8 @@ function checkAudioLevels() {
         if(dbspl >= 90 && audioLevelImage.animating == false) {
             var t = Titanium.UI.create2DMatrix();
             t = t.scale(1.1 + ((dbspl-90)/20)); // scale relative to dbspl
-            audioLevelImage.animate({transform:t, duration:100},function()
-            {
-                var t = Titanium.UI.create2DMatrix();
+            audioLevelImage.animate({transform:t, duration:100},function() {
+                t  = Ti.UI.create2DMatrix();
                 audioLevelImage.animate({transform:t, duration:200});
             });
         }
@@ -1183,8 +1182,6 @@ else
 	// Titanium.Geolocation.ACCURACY_THREE_KILOMETERS
 	//
 	Titanium.Geolocation.accuracy = Titanium.Geolocation.ACCURACY_BEST;
-
-	//
 	Titanium.Geolocation.distanceFilter = 1;
 
 
@@ -1266,9 +1263,8 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     if(Math.abs(mag) > 1.5 && forceImage.animating == false) {
         var t = Titanium.UI.create2DMatrix();
         t = t.scale(Math.abs(mag));
-        forceImage.animate({transform:t, duration:100},function()
-        {
-            var t = Titanium.UI.create2DMatrix();
+        forceImage.animate({transform:t, duration:100},function() {
+            t = Ti.UI.create2DMatrix();
             forceImage.animate({transform:t, duration:200});
         });
     }
