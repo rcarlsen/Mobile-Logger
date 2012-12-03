@@ -771,20 +771,10 @@ function stopLogging() {
 // end logging methods//
 
 
-
-// hack for the setting the value of the switch at launch
-var switchFirstRun = true;
-
 // use the compass for toggling the recording
 loggingSwitch.addEventListener('change',function(e) {
     // just show an alert view for now
     var sw = e.source;
-
-    // hack for setting the switch value at launch
-    if(switchFirstRun) {
-        switchFirstRun = false;
-        return;
-    }
 
     if(e.value == false && loggingState == true) { 
         // added the loggingState bit to help prevent a double alert 
