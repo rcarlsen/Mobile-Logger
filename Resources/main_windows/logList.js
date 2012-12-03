@@ -1062,32 +1062,25 @@ function addLogRow(rowData) // should include title(date), duration, distance, e
 
     // distance / average
     var avgSpeedString;
-    var distanceString; 
+    var distanceString;
+    
+    // don't divide by zero.
+    var avgSpeedMetersPerSec = (rowData.duration <= 0) ? 0 : (rowData.distance / (rowData.duration / 1000.));
+    
      if(Ti.App.Properties.getBool('useMetric',false)) {
         //Ti.API.info('Metric units');
         var distanceUnits = "km";
         var speedUnits = 'km/h';
 
-        var distanceUnitValue = 0.001; //m -> km
-        var speedUnitValue = 3.6; // m/s -> M/hr
-
-        distanceString = (rowData.distance * distanceUnitValue).toFixed(2) +' '+distanceUnits;
-
-        // don't divide by zero.
-        avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValue;
-        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnits;
+        distanceString = toKM(rowData.distance).toFixed(2) +' '+distanceUnits;
+        avgSpeedString = toKPH(avgSpeedMetersPerSec).toFixed(2) +' '+speedUnits;
     } else {
         //Ti.API.info('Imperial units');
         var distanceUnitsImperial = "mi";
         var speedUnitsImperial = 'mph';
 
-        var distanceUnitValueImperial = 0.000621371192; // m -> mile
-        var speedUnitValueImperial = 2.236936; // m/s -> M/hr
-
-        distanceString = (rowData.distance * distanceUnitValueImperial).toFixed(2) +' '+distanceUnitsImperial;
-
-        avgSpeedString = (rowData.duration/1000 == 0) ? 0 : (rowData.distance / (rowData.duration/1000)) * speedUnitValueImperial;
-        avgSpeedString = avgSpeedString.toFixed(2) +' '+speedUnitsImperial;
+        distanceString = toMiles(rowData.distance).toFixed(2) +' '+distanceUnitsImperial;
+        avgSpeedString = toMPH(avgSpeedMetersPerSec).toFixed(2) +' '+speedUnitsImperial;
    }
    //Ti.API.info('Created the distanceString: '+distanceString);
 
