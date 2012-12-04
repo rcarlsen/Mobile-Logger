@@ -414,23 +414,24 @@ function bulkUpload (samples) {
     // start the progress meter
     //Ti.API.info('About to tell app to create a new progress bar');
     //Ti.UI.currentWindow.fireEvent('uploadProgress',{value:0});
-
-    var xhr = Titanium.Network.createHTTPClient();
-    xhr.onload = function(e)
+    this._xhr = Titanium.Network.createHTTPClient();
+    var my = this;
+    
+    my._xhr.onload = function(e)
     {
         // hack to clear a bad session token:
-        if(xhr.status != 200) {
+        if(my._xhr.status != 200) {
             // clear the previous session auth header:
-            Ti.API.info("Clearing the the Google token. Status: "+xhr.status);
+            Ti.API.info("Clearing the the Google token. Status: "+my._xhr.status);
             Ti.App.Properties.setString('googleClientLoginAuth','');
         }
 
         // done with the upload
         //Ti.UI.currentWindow.fireEvent('uploadProgress',{value:1.0});
-        Ti.API.info("Upload finished: "+xhr.responseText);
+        Ti.API.info("Upload finished: "+my_xhr.responseText);
         return e.responseText;
     };
-    xhr.onerror = function(e)
+    my._xhr.onerror = function(e)
     {
         //Ti.UI.currentWindow.fireEvent('uploadProgress',{value:-1});
 
@@ -439,9 +440,9 @@ function bulkUpload (samples) {
         return e.responseText;
     };
 
-    xhr.onsendstream = function(e)
+    my._xhr.onsendstream = function(e)
     {
-        if(cancel) { xhr.abort(); }
+        if(cancel) { my._xhr.abort(); }
         Ti.API.info("onsendstream called");
         //Ti.UI.currentWindow.fireEvent('uploadProgress',{value:e.progress});
     };
@@ -460,11 +461,11 @@ function bulkUpload (samples) {
 //            statements.push("INSERT INTO "+tableID+" (timestamp) VALUES ("+samples[0].timestamp+")");
             Ti.API.info(sqlQuery);
             
-            xhr.open("POST","https://www.google.com/fusiontables/api/query");
-            xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-            xhr.setRequestHeader('Authorization',Ti.App.Properties.getString('googleClientLoginAuth'));
+            my._xhr.open("POST","https://www.google.com/fusiontables/api/query");
+            my._xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+            my._xhr.setRequestHeader('Authorization',Ti.App.Properties.getString('googleClientLoginAuth'));
 
-            xhr.send(sqlQuery);
+            my._xhr.send(sqlQuery);
         };
 
 
@@ -533,8 +534,8 @@ function bulkUpload (samples) {
     }
     else {
         var out = {docs:samples};
-        xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
-        xhr.send("data="+JSON.stringify(out));
+        my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
+        my._xhr.send("data="+JSON.stringify(out));
     }
 }
 

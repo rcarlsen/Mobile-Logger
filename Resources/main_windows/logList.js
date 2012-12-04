@@ -213,7 +213,9 @@ function sendLog(params){
                     manager.bulkUploadBatch(tmpData);
                 }
             }
-
+            else {
+                    manager.bulkUploadBatch(tmpData);
+            }
             Ti.API.info('just started a bulk upload');
         } catch(err) {
             Ti.API.info('There was an error with bulkUpload()');
@@ -288,10 +290,19 @@ function sendLog(params){
             tempFile = Ti.Filesystem.getFile(tempFile.getParent(),outfilename);
             tempFile.write(tmpDataString);
             Ti.API.info('wrote to temp log file: '+tempFile.resolve());
-
+			
             // Compress the newly created temp file
-           var zipFilePath = Ti.Compression.compressFile(tempFile.path);
-           Ti.API.info('zip file path: '+zipFilePath);
+            var zipFilePath;
+            try {
+                //Run some code here
+                Ti.API.info('about to compress log file');
+                zipFilePath = Ti.Compression.compressFile(tempFile.resolve());
+                Ti.API.info('zip file path: '+zipFilePath);
+            } catch(err) {
+                //Handle errors here
+                Ti.API.info('Problem with Compression module');
+            }
+           
 
             if(zipFilePath) { // it was successful, attach this
                 emailView.addAttachment(Ti.Filesystem.getFile(zipFilePath));

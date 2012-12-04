@@ -464,6 +464,12 @@ function addNetworkRow(label,property,valuesList,initialValue)
                             }
                         });
                     }
+                    if(i == 'fusionTablesOAuth') {
+                        Ti.API.log('in fusion tables OAuth');
+                        
+                        //TODO: find Google OAuth lib.
+                    }
+
                 }
             }
             thisTable.setData(data);
@@ -509,7 +515,13 @@ function addNetworkRow(label,property,valuesList,initialValue)
 // set up the settings table rows:
 var inputData = [];
 
-var networkServiceRow = addNetworkRow('Upload Service','uploadService',{fusionTables:'Google Fusion Tables',mobileLogger:'Mobile Logger'},'mobileLogger');
+var networkServiceRow = addNetworkRow('Upload Service','uploadService',
+{
+    fusionTables:'Google Fusion Tables',
+    fusionTablesOAuth:'Google Fusion Tables (OAuth)',
+    mobileLogger:'Mobile Logger (old)'
+},'mobileLogger');
+    
 var networkRow = addControlRow('Upload While Logging','uploadEnabled',true);
 networkRow.footer = 'Send data to a network service';
 inputData.push(networkServiceRow);
