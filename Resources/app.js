@@ -129,7 +129,7 @@ function sendBuffer(d) {
                 //', deviceid: '+d.deviceID);
 
     //Ti.API.info('Sending Buffer');
-    // send the batch of docIDs in the uploadBuffer
+    // send the batch of docIDs in the docBuffer
     // need to retrieve them from the database 
     var logDB = Ti.Database.open("log.db");
  

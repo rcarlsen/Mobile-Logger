@@ -60,11 +60,6 @@ var eventDuration = 0;
 var clockInterval = 0;
 var audioListenerInterval = 0;
 
-// TODO: work with the database when generating the upload buffer
-// to record which records have been uploaded
-var uploadBuffer = [];
-var uploadTrigger = 10;
-
 // set up configuration for metric or imperial
 // data should *always* be stored in metric / meters
 // this configuration will only affect display
@@ -452,9 +447,6 @@ function resetValues (restore) {
     deviceID =  Titanium.Utils.md5HexDigest(Ti.Platform.id);
     Ti.API.info('Set device ID: '+deviceID);
 
-    // clear the upload buffer
-    uploadBuffer = [];
-
     if(restore == false) {
         Ti.API.info('Creating a new event log.');
         // create a new event
@@ -558,25 +550,6 @@ function recordSample() {
 
     //Titanium.API.info("Current sample recorded to db");
     //Titanium.API.info('Time: '+currentSample.timestamp);
-
-    // upload the sample
-    // DEBUG: testing only
-    // TODO: abstract / buffer this process.
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        // add this sample to the upload buffer:
-        uploadBuffer.push(docID);
-        if(uploadBuffer.length >= uploadTrigger){
-            try{
-                win.sendBuffer({'docBuffer':uploadBuffer,
-                            'eventID':eventID,
-                            'deviceID':deviceID});
-                // clear the buffer
-                uploadBuffer = [];
-            } catch(err) {
-                Ti.API.info('Error uploading the sample buffer: '+err.toLocaleString());    
-            }
-        }
-    }
 };
 
 function updateDistanceLabel (delta) {
@@ -747,17 +720,6 @@ function stopLogging() {
 
     clearInterval(clockInterval);
     clockInterval = 0;
- 
-    // push the final samples to the server
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        try{
-            win.sendBuffer({'docBuffer':uploadBuffer,
-                        'eventID':eventID,
-                        'deviceID':deviceID});
-        } catch(err) {
-            Ti.API.info('Error uploading the final buffer: ' + err.toLocaleString());
-        }
-    }
 
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
