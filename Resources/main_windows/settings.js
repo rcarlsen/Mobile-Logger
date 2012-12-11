@@ -259,6 +259,7 @@ function addInfoRow(label,property)
         row.add(cellValue);
     }
 
+    row.selectionStyle = Titanium.UI.iPhone.TableViewCellSelectionStyle.NONE;
   	row.className = 'info';
 	return row;
 
