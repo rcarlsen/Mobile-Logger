@@ -551,16 +551,19 @@ function addMapRow (logData) {
     }
     //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
-    var lastPoint = Titanium.Map.createAnnotation({
-        latitude:logData.last.lat,
-        longitude:logData.last.lon,
-        title:"Log end",
-        subtitle:new Date(logData.last.timestamp).toLocaleString(),
-        pincolor:Titanium.Map.ANNOTATION_RED,
-        animate:true,
-        //leftButton: '../images/appcelerator_small.png',
-        myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
-    });
+    var lastPoint = null;
+    if(logData.last.lat && logData.last.lon) {
+        lastPoint = Titanium.Map.createAnnotation({
+            latitude:logData.last.lat,
+            longitude:logData.last.lon,
+            title:"Log end",
+            subtitle:new Date(logData.last.timestamp).toLocaleString(),
+            pincolor:Titanium.Map.ANNOTATION_RED,
+            animate:true,
+            //leftButton: '../images/appcelerator_small.png',
+            myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+        });
+    }
     //Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
 
     
@@ -604,16 +607,20 @@ function addMapRow (logData) {
     //Ti.API.info('Created anntations');
 
     // add the first point to the route point array:
-    routePoints.unshift({
-        latitude:firstPoint.latitude,
-        longitude:firstPoint.longitude
-    });
+    if(firstPoint) {
+        routePoints.unshift({
+            latitude:firstPoint.latitude,
+            longitude:firstPoint.longitude
+        });
+    }
     
     // add the last point to the route point array:
-    routePoints.push({
-        latitude:lastPoint.latitude,
-        longitude:lastPoint.longitude
+    if(lastPoint) {
+        routePoints.push({
+            latitude:lastPoint.latitude,
+            longitude:lastPoint.longitude
     });
+    }
     
     // create the map view:
     var map = Ti.Map.createView({
@@ -622,22 +629,27 @@ function addMapRow (logData) {
         borderWidth:1,
         borderColor:'#999',
         touchEnabled:false,
-        annotations:[firstPoint,lastPoint]
+        mapType:Ti.Map.STANDARD_TYPE
     });
+    if(firstPoint) {map.addAnnotation(firstPoint);}
+    if(lastPoint) {map.addAnnotation(lastPoint);}
     //Ti.API.info('Created map view');
 
 
     // create route object:
-    var route = {
-        name:"Log",
-        points:routePoints,
-        color:"purple",
-        width:(retinaDisplay) ? 8 : 4 // this needs to be adjusted for non-Retina displays  
-    };
+    var route = null;
+    if(routePoints.length > 0) {
+        route = {
+            name:"Log",
+            points:routePoints,
+            color:"purple",
+            width:(retinaDisplay) ? 8 : 4 // this needs to be adjusted for non-Retina displays  
+        };
+        
+        // add a route
+        map.addRoute(route);
+    }
     
-    // add a route
-    map.addRoute(route);
-
     map.userLocation = false;
     //map.annotations = [firstPoint,lastPoint];
     //Ti.API.info('Added annotations to the map');
@@ -647,8 +659,8 @@ function addMapRow (logData) {
     // or, more simply use the first and last points
     // calculate the midpoint for the region center
     // and half the distance between them (in degrees) (+ 10%?) as the deltas
-    var p1 = {lat:firstPoint.latitude, lon:firstPoint.longitude};
-    var p2 = {lat:lastPoint.latitude, lon:lastPoint.longitude};
+    var p1 = (firstPoint) ? {lat:firstPoint.latitude, lon:firstPoint.longitude} : {lat:null, lon:null} ;
+    var p2 = (lastPoint) ? {lat:lastPoint.latitude, lon:lastPoint.longitude} : {lat:null, lon: null} ;
 
     // sanity checking:
     var setRegion = true;
@@ -710,15 +722,21 @@ function addMapRow (logData) {
         bigMap.width = mapwin.getWidth();
         bigMap.regionFit = true;
         bigMap.region = map.region;
-        dataPoints.push(firstPoint);
-        dataPoints.push(lastPoint);
+        bigMap.mapType = Ti.Map.STANDARD_TYPE;
+        
+        if(firstPoint) { dataPoints.push(firstPoint); }
+        if(lastPoint) { dataPoints.push(lastPoint); }
 
         // add all the other annotations
-        bigMap.annotations = dataPoints;
+        if(dataPoints.length > 0) {
+            bigMap.annotations = dataPoints;
+        }
         
         // add the route line
-        bigMap.addRoute(route);
-
+        if(route) {
+            bigMap.addRoute(route);
+        }
+        
         mapwin.add(bigMap);
         //Ti.API.info('added the map view to the new map window');
 
@@ -731,8 +749,10 @@ function addMapRow (logData) {
         //Ti.API.info('Should have opened the map window');
     });
     
-    row.add(detailButton); 
-
+    // only add the detail button if there are annotations / route
+    if(dataPoints.length > 0 || route) {
+        row.add(detailButton); 
+    }
     row.className = 'maprow';
 
     //Ti.API.info('Returning map row');
