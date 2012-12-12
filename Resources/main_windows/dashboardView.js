@@ -577,11 +577,16 @@ function updateDistanceLabel (delta) {
 
 var compassTransformation = Ti.UI.create2DMatrix();
 function rotateCompass(degrees) {
+    
 	// don't interrupt the current animation
 	// TODO: figure out why this seems to be ignored.
     if(compass.getAnimating() == false) { 
         var t = compassTransformation;
         t = t.rotate(360-degrees);
+        
+        // animation is *still* not working correctly. sigh.
+        compass.setTransform(t);
+        return;
         
         var a = Titanium.UI.createAnimation({
            transform:  t,
