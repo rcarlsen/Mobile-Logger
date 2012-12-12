@@ -315,22 +315,35 @@ function addExportDbRow(label)
         Ti.API.info('In the about row click event');
 
         var emailDialog = Titanium.UI.createEmailDialog();
-        emailDialog.barColor = orangeColor;
-
-        emailDialog.subject = "Mobile Logger Database";
-        //emailDialog.toRecipients = ['foo@yahoo.com'];
-        emailDialog.messageBody = 'Attached is the sqlite database file from Mobile Logger.';
-        // Compress the newly created temp file
-        var zipFilePath = Ti.Compression.compressFile(f.path);
-        Ti.API.info('zip file path: '+zipFilePath);
-
-        if(zipFilePath) { // it was successful, attach this
-            emailDialog.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+        
+        // alert if email is not supported (eg. don't have an e-mail acconut set up)
+        if(emailDialog.isSupported()) {
+            emailDialog.barColor = orangeColor;
+    
+            emailDialog.subject = "Mobile Logger Database";
+            //emailDialog.toRecipients = ['foo@yahoo.com'];
+            emailDialog.messageBody = 'Attached is the sqlite database file from Mobile Logger.';
+            // Compress the newly created temp file
+            var zipFilePath = Ti.Compression.compressFile(f.path);
+            Ti.API.info('zip file path: '+zipFilePath);
+    
+            if(zipFilePath) { // it was successful, attach this
+                emailDialog.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+            }
+            else {
+                emailDialog.addAttachment(f);
+            }
+            emailDialog.open();
+            Ti.API.info('Email dialog should have opened');
         }
         else {
-            emailDialog.addAttachment(f);
+            // alert
+            var dialog = Ti.UI.createAlertDialog({
+                title: 'Cannot Export',
+                message: 'Please set up a default e-mail account.',
+                ok: 'OK'
+            }).show();
         }
-        emailDialog.open();
         
         // clean up:
         activityIndicator.hide();
