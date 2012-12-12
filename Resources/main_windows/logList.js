@@ -530,25 +530,26 @@ function addMapRow (logData) {
     // in the form of {latitude:,longitude:}
     var routePoints = [];
 
-    // Create the annotations
-    var firstPoint = Titanium.Map.createAnnotation({
-        latitude:logData.first.lat,
-        longitude:logData.first.lon,
-        title:"Log start",
-        subtitle:new Date(logData.first.timestamp).toLocaleString(),
-        pincolor:Titanium.Map.ANNOTATION_GREEN,
-        animate:true,
-        //leftButton: '../images/appcelerator_small.png',
-        myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
-    });
-    //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
+    // Create the annotations:
+    function createFirstAnnotation(data) {
+        return Titanium.Map.createAnnotation({
+                    latitude:data.lat,
+                    longitude:data.lon,
+                    title:"Log start",
+                    subtitle:new Date(data.timestamp).toLocaleString(),
+                    pincolor:Titanium.Map.ANNOTATION_GREEN,
+                    animate:true,
+                    //leftButton: '../images/appcelerator_small.png',
+                    myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+                });
+    }
     
-    // add the first point to the route point array:
-    routePoints.push({
-        latitude:logData.first.lat,
-        longitude:logData.first.lon
-    });
-    Ti.API.info("pushed the first point to the route array: "+routePoints);
+    // may not have this point...
+    var firstPoint = null;
+    if(logData.first.lat && logData.first.lon) {
+        firstPoint = createFirstAnnotation(logData.first); 
+    }
+    //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
     var lastPoint = Titanium.Map.createAnnotation({
         latitude:logData.last.lat,
@@ -568,13 +569,23 @@ function addMapRow (logData) {
     for (var i = 0; i < logData.data.length; i++) {
         var d = logData.data[i];
         
+        // only include this data point if location data is here.
+        if(!d.lat || !d.lon) { continue; }
+        
+        // if the firstPoint is null...then use the first available data point:
+        if(firstPoint == null) {
+            firstPoint = createFirstAnnotation(d);
+        }
+        
         // make a speed note
         var speedString;
+        
+        // using Math.max() to filter out the -1 values from bad speed readings
+        var metersPerSecond = (!d.speed) ? 0 : Math.max(0,d.speed);
         if(Ti.App.Properties.getBool('useMetric',false)) {
-            // using Math.max() to filter out the -1 values from bad speed readings
-            speedString = toKPH(Math.max(0,d.speed)).toFixed(2) +' km/h';
+            speedString = toKPH(metersPerSecond).toFixed(2) +' km/h';
         }else{
-            speedString = toMPH(Math.max(0,d.speed)).toFixed(2) + ' mph';
+            speedString = toMPH(metersPerSecond).toFixed(2) + ' mph';
         }
         var point = Ti.Map.createAnnotation({
             latitude:d.lat,
@@ -592,10 +603,16 @@ function addMapRow (logData) {
     };
     //Ti.API.info('Created anntations');
 
+    // add the first point to the route point array:
+    routePoints.unshift({
+        latitude:firstPoint.latitude,
+        longitude:firstPoint.longitude
+    });
+    
     // add the last point to the route point array:
     routePoints.push({
-        latitude:logData.last.lat,
-        longitude:logData.last.lon
+        latitude:lastPoint.latitude,
+        longitude:lastPoint.longitude
     });
     
     // create the map view:
