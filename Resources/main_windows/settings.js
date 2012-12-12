@@ -163,7 +163,7 @@ function addExportRow(label,property,valuesList,initialValue)
             Ti.API.info('Added export table to export window');
 
             Titanium.UI.currentTab.open(exportWin,{animated:true});
-            Ti.API.info('Export format window whould have opened');
+            Ti.API.info('Export format window should have opened');
         });
 
 	}
