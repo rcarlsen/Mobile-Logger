@@ -285,14 +285,10 @@ function addExportDbRow(label)
     row.add(cellLabel);
 
     // get the db and list the size...this could be a memory killer
-    // hack to clean up the busted path
-    var dbPath = Ti.Filesystem.applicationDirectory;
-    dbPath = dbPath.substring(0,dbPath.length - 'Applications'.length);
-    dbPath += 'Library/Application Support/database/log.db.sql';
-
-    // iPhone only path. Is this a fragile path, too?
-    var f = Ti.Filesystem.getFile(dbPath);
-    Ti.API.info('db file exists: '+ ((f.exists) ? 'yes' : 'no') +' path: '+dbPath);
+    var logDB = Ti.Database.open("log.db");
+    var f = logDB.getFile();
+    
+    Ti.API.info('db file exists: '+ ((f.exists) ? 'yes' : 'no')); // +' path: '+f.resolve());
 
     var cellValue = Ti.UI.createLabel({
         text:(f.read.size/1024) + ' kB',
