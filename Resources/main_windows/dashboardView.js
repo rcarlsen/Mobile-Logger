@@ -1058,7 +1058,7 @@ else
 
 		// SET THE HEADING FILTER (THIS IS IN DEGREES OF ANGLE CHANGE)
 		// EVENT WON'T FIRE UNLESS ANGLE CHANGE EXCEEDS THIS VALUE
-		Titanium.Geolocation.headingFilter = 2;
+		Titanium.Geolocation.headingFilter = 1;
 
 		//  GET CURRENT HEADING - THIS FIRES ONCE
 		Ti.Geolocation.getCurrentHeading(function(e)
