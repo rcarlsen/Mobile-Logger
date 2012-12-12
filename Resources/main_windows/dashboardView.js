@@ -579,16 +579,20 @@ var compassTransformation = Ti.UI.create2DMatrix();
 function rotateCompass(degrees) {
 	// don't interrupt the current animation
 	// TODO: figure out why this seems to be ignored.
-    if(compass.getAnimating() == false) { 
+	Ti.API.info("in rotateCompass, compass animating: "+compass.getAnimating());
+
+    if(compass.getAnimating() === false) {
         var t = compassTransformation;
         t = t.rotate(360-degrees);
         
         var a = Titanium.UI.createAnimation({
            transform:  t,
-           duration:   300
+           duration:   500
         });
         
-        compass.animate(a);
+        compass.animate(a, function(e){
+            Ti.API.info("compass animation complete");
+        });
 	}
 }
 
@@ -1002,7 +1006,7 @@ function checkAudioLevels() {
         // animate audio image
         // use a callback at the end to scale back
         // using 90 as a threshhold - busy street for dB (not dBFS)
-        if(dbspl >= 90 && audioLevelImage.animating == false) {
+        if(dbspl >= 90 && audioLevelImage.getAnimating() == false) {
             var t = Titanium.UI.create2DMatrix();
             t = t.scale(1.1 + ((dbspl-90)/20)); // scale relative to dbspl
             audioLevelImage.animate({transform:t, duration:100},function() {
@@ -1216,7 +1220,7 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     if(mag == null) { mag = 0; }
 
     // Let the label lock to the triggered value during animation
-    if(!forceImage.animating) {
+    if(forceImage.getAnimating() == false) {
        updateForceLabel(mag);
     }
 	// animate force image
