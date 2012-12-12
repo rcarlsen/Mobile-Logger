@@ -298,10 +298,20 @@ function addExportDbRow(label)
     });
     row.add(cellValue);
 
+    function exportDBCallback(e) {
+        // the compression may take a while, disable the button
+        // until the compression is finished:
+        row.removeEventListener('click',exportDBCallback);
+        row.setSelectionStyle(Ti.UI.iPhone.TableViewCellSelectionStyle.NONE);
 
-    // add a child view
-    row.addEventListener('click',function(e){
-
+        // this may take a while, create an indicator:
+        var activityIndicator = Ti.UI.createActivityIndicator({
+              style:Ti.UI.iPhone.ActivityIndicatorStyle.DARK,
+              right: (10 + cellValue.size.width + 20)
+        });
+        activityIndicator.show();
+        row.add(activityIndicator);
+        
         Ti.API.info('In the about row click event');
 
         var emailDialog = Titanium.UI.createEmailDialog();
@@ -321,7 +331,18 @@ function addExportDbRow(label)
             emailDialog.addAttachment(f);
         }
         emailDialog.open();
-    });
+        
+        // clean up:
+        activityIndicator.hide();
+        row.remove(activityIndicator);
+        row.setSelectionStyle(Ti.UI.iPhone.TableViewCellSelectionStyle.BLUE);
+
+        // add the event listener again:
+        row.addEventListener('click',exportDBCallback);
+    };
+    
+    // add a child view
+    row.addEventListener('click',exportDBCallback);
     row.className = 'exportdb';
     return row;
 }
