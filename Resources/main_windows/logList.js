@@ -34,6 +34,8 @@ Ti.include('../tools/util.js');
 var win = Ti.UI.currentWindow;
 var detailWindow;
 
+var retinaDisplay = (Ti.Platform.displayCaps.density == 'high');
+
 var imagesPath = Titanium.Filesystem.resourcesDirectory + '/images/';
 
 // add an activity indicator 
@@ -553,44 +555,69 @@ function addMapRow (logData) {
     }
     //Ti.API.info('Created row container');
 
+    // array of point objects for drawing the route polyline
+    // in the form of {latitude:,longitude:}
+    var routePoints = [];
 
-    // Create the annotations
-    var firstPoint = Titanium.Map.createAnnotation({
-        latitude:logData.first.lat,
-        longitude:logData.first.lon,
-        title:"Log start",
-        subtitle:new Date(logData.first.timestamp).toLocaleString(),
-        pincolor:Titanium.Map.ANNOTATION_GREEN,
-        animate:true,
-        //leftButton: '../images/appcelerator_small.png',
-        myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
-    });
+    // Create the annotations:
+    function createFirstAnnotation(data) {
+        return Titanium.Map.createAnnotation({
+                    latitude:data.lat,
+                    longitude:data.lon,
+                    title:"Log start",
+                    subtitle:new Date(data.timestamp).toLocaleString(),
+                    pincolor:Titanium.Map.ANNOTATION_GREEN,
+                    animate:true,
+                    //leftButton: '../images/appcelerator_small.png',
+                    myid:1 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+                });
+    }
+    
+    // may not have this point...
+    var firstPoint = null;
+    if(logData.first.lat && logData.first.lon) {
+        firstPoint = createFirstAnnotation(logData.first); 
+    }
     //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
-    var lastPoint = Titanium.Map.createAnnotation({
-        latitude:logData.last.lat,
-        longitude:logData.last.lon,
-        title:"Log end",
-        subtitle:new Date(logData.last.timestamp).toLocaleString(),
-        pincolor:Titanium.Map.ANNOTATION_RED,
-        animate:true,
-        //leftButton: '../images/appcelerator_small.png',
-        myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
-    });
+    var lastPoint = null;
+    if(logData.last.lat && logData.last.lon) {
+        lastPoint = Titanium.Map.createAnnotation({
+            latitude:logData.last.lat,
+            longitude:logData.last.lon,
+            title:"Log end",
+            subtitle:new Date(logData.last.timestamp).toLocaleString(),
+            pincolor:Titanium.Map.ANNOTATION_RED,
+            animate:true,
+            //leftButton: '../images/appcelerator_small.png',
+            myid:2 // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
+        });
+    }
     //Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
 
+    
     // now, create all the other annotations.
-    var dataPoints = [];
+    var dataPoints = [];  // annotations
     for (var i = 0; i < logData.data.length; i++) {
         var d = logData.data[i];
         
+        // only include this data point if location data is here.
+        if(!d.lat || !d.lon) { continue; }
+        
+        // if the firstPoint is null...then use the first available data point:
+        if(firstPoint == null) {
+            firstPoint = createFirstAnnotation(d);
+        }
+        
         // make a speed note
         var speedString;
+        
+        // using Math.max() to filter out the -1 values from bad speed readings
+        var metersPerSecond = (!d.speed) ? 0 : Math.max(0,d.speed);
         if(Ti.App.Properties.getBool('useMetric',false)) {
-            // using Math.max() to filter out the -1 values from bad speed readings
-            speedString = toKPH(Math.max(0,d.speed)).toFixed(2) +' km/h';
+            speedString = toKPH(metersPerSecond).toFixed(2) +' km/h';
         }else{
-            speedString = toMPH(Math.max(0,d.speed)).toFixed(2) + ' mph';
+            speedString = toMPH(metersPerSecond).toFixed(2) + ' mph';
         }
         var point = Ti.Map.createAnnotation({
             latitude:d.lat,
@@ -602,19 +629,56 @@ function addMapRow (logData) {
             myid:2+i // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
         });
         dataPoints.push(point);
+        
+        var entry = {latitude:d.lat,longitude:d.lon};
+        routePoints.push(entry);
     };
     //Ti.API.info('Created anntations');
 
+    // add the first point to the route point array:
+    if(firstPoint) {
+        routePoints.unshift({
+            latitude:firstPoint.latitude,
+            longitude:firstPoint.longitude
+        });
+    }
+    
+    // add the last point to the route point array:
+    if(lastPoint) {
+        routePoints.push({
+            latitude:lastPoint.latitude,
+            longitude:lastPoint.longitude
+    });
+    }
+    
+    // create the map view:
     var map = Ti.Map.createView({
         width:300,height:mapHeight,
         borderRadius:10,
         borderWidth:1,
         borderColor:'#999',
         touchEnabled:false,
-        annotations: [firstPoint,lastPoint]
+        mapType:Ti.Map.STANDARD_TYPE
     });
+    if(firstPoint) {map.addAnnotation(firstPoint);}
+    if(lastPoint) {map.addAnnotation(lastPoint);}
     //Ti.API.info('Created map view');
 
+
+    // create route object:
+    var route = null;
+    if(routePoints.length > 0) {
+        route = {
+            name:"Log",
+            points:routePoints,
+            color:"purple",
+            width:(retinaDisplay) ? 8 : 4 // this needs to be adjusted for non-Retina displays  
+        };
+        
+        // add a route
+        map.addRoute(route);
+    }
+    
     map.userLocation = false;
     //map.annotations = [firstPoint,lastPoint];
     //Ti.API.info('Added annotations to the map');
@@ -624,8 +688,8 @@ function addMapRow (logData) {
     // or, more simply use the first and last points
     // calculate the midpoint for the region center
     // and half the distance between them (in degrees) (+ 10%?) as the deltas
-    var p1 = {lat:firstPoint.latitude, lon:firstPoint.longitude};
-    var p2 = {lat:lastPoint.latitude, lon:lastPoint.longitude};
+    var p1 = (firstPoint) ? {lat:firstPoint.latitude, lon:firstPoint.longitude} : {lat:null, lon:null} ;
+    var p2 = (lastPoint) ? {lat:lastPoint.latitude, lon:lastPoint.longitude} : {lat:null, lon: null} ;
 
     // sanity checking:
     var setRegion = true;
@@ -687,12 +751,21 @@ function addMapRow (logData) {
         bigMap.width = mapwin.getWidth();
         bigMap.regionFit = true;
         bigMap.region = map.region;
-        dataPoints.push(firstPoint);
-        dataPoints.push(lastPoint);
+        bigMap.mapType = Ti.Map.STANDARD_TYPE;
+        
+        if(firstPoint) { dataPoints.push(firstPoint); }
+        if(lastPoint) { dataPoints.push(lastPoint); }
 
         // add all the other annotations
-        bigMap.annotations = dataPoints;
-
+        if(dataPoints.length > 0) {
+            bigMap.annotations = dataPoints;
+        }
+        
+        // add the route line
+        if(route) {
+            bigMap.addRoute(route);
+        }
+        
         mapwin.add(bigMap);
         //Ti.API.info('added the map view to the new map window');
 
@@ -705,8 +778,10 @@ function addMapRow (logData) {
         //Ti.API.info('Should have opened the map window');
     });
     
-    row.add(detailButton); 
-
+    // only add the detail button if there are annotations / route
+    if(dataPoints.length > 0 || route) {
+        row.add(detailButton); 
+    }
     row.className = 'maprow';
 
     //Ti.API.info('Returning map row');
@@ -896,7 +971,6 @@ function displayDetail(rowData) {
         // set up and display an action sheet with upload choices:
         var optionsDialog = Titanium.UI.createOptionDialog({
            options:['Upload', 'Email', 'Cancel'],
-           //destructive:2,
            cancel:2,
            title:'Export Log'
         });

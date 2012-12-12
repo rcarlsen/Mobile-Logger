@@ -207,7 +207,7 @@ function addExportRow(label,property,valuesList,initialValue)
             Ti.API.info('Added export table to export window');
 
             Titanium.UI.currentTab.open(exportWin,{animated:true});
-            Ti.API.info('Export format window whould have opened');
+            Ti.API.info('Export format window should have opened');
         });
 
 	}
@@ -303,6 +303,7 @@ function addInfoRow(label,property)
         row.add(cellValue);
     }
 
+    row.selectionStyle = Titanium.UI.iPhone.TableViewCellSelectionStyle.NONE;
   	row.className = 'info';
 	return row;
 
@@ -328,14 +329,10 @@ function addExportDbRow(label)
     row.add(cellLabel);
 
     // get the db and list the size...this could be a memory killer
-    // hack to clean up the busted path
-    var dbPath = Ti.Filesystem.applicationDirectory;
-    dbPath = dbPath.substring(0,dbPath.length - 'Applications'.length);
-    dbPath += 'Library/Application Support/database/log.db.sql';
-
-    // iPhone only path. Is this a fragile path, too?
-    var f = Ti.Filesystem.getFile(dbPath);
-    Ti.API.info('db file exists: '+ ((f.exists) ? 'yes' : 'no') +' path: '+dbPath);
+    var logDB = Ti.Database.open("log.db");
+    var f = logDB.getFile();
+    
+    Ti.API.info('db file exists: '+ ((f.exists) ? 'yes' : 'no')); // +' path: '+f.resolve());
 
     var cellValue = Ti.UI.createLabel({
         text:(f.read.size/1024) + ' kB',
@@ -345,30 +342,64 @@ function addExportDbRow(label)
     });
     row.add(cellValue);
 
+    function exportDBCallback(e) {
+        // the compression may take a while, disable the button
+        // until the compression is finished:
+        row.removeEventListener('click',exportDBCallback);
+        row.setSelectionStyle(Ti.UI.iPhone.TableViewCellSelectionStyle.NONE);
 
-    // add a child view
-    row.addEventListener('click',function(e){
-
+        // this may take a while, create an indicator:
+        var activityIndicator = Ti.UI.createActivityIndicator({
+              style:Ti.UI.iPhone.ActivityIndicatorStyle.DARK,
+              right: (10 + cellValue.size.width + 20)
+        });
+        activityIndicator.show();
+        row.add(activityIndicator);
+        
         Ti.API.info('In the about row click event');
 
         var emailDialog = Titanium.UI.createEmailDialog();
-        emailDialog.barColor = orangeColor;
-
-        emailDialog.subject = "Mobile Logger Database";
-        //emailDialog.toRecipients = ['foo@yahoo.com'];
-        emailDialog.messageBody = 'Attached is the sqlite database file from Mobile Logger.';
-        // Compress the newly created temp file
-        var zipFilePath = Ti.Compression.compressFile(f.path);
-        Ti.API.info('zip file path: '+zipFilePath);
-
-        if(zipFilePath) { // it was successful, attach this
-            emailDialog.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+        
+        // alert if email is not supported (eg. don't have an e-mail acconut set up)
+        if(emailDialog.isSupported()) {
+            emailDialog.barColor = orangeColor;
+    
+            emailDialog.subject = "Mobile Logger Database";
+            //emailDialog.toRecipients = ['foo@yahoo.com'];
+            emailDialog.messageBody = 'Attached is the sqlite database file from Mobile Logger.';
+            // Compress the newly created temp file
+            var zipFilePath = Ti.Compression.compressFile(f.path);
+            Ti.API.info('zip file path: '+zipFilePath);
+    
+            if(zipFilePath) { // it was successful, attach this
+                emailDialog.addAttachment(Ti.Filesystem.getFile(zipFilePath));
+            }
+            else {
+                emailDialog.addAttachment(f);
+            }
+            emailDialog.open();
+            Ti.API.info('Email dialog should have opened');
         }
         else {
-            emailDialog.addAttachment(f);
+            // alert
+            var dialog = Ti.UI.createAlertDialog({
+                title: 'Cannot Export',
+                message: 'Please set up a default e-mail account.',
+                ok: 'OK'
+            }).show();
         }
-        emailDialog.open();
-    });
+        
+        // clean up:
+        activityIndicator.hide();
+        row.remove(activityIndicator);
+        row.setSelectionStyle(Ti.UI.iPhone.TableViewCellSelectionStyle.BLUE);
+
+        // add the event listener again:
+        row.addEventListener('click',exportDBCallback);
+    };
+    
+    // add a child view
+    row.addEventListener('click',exportDBCallback);
     row.className = 'exportdb';
     return row;
 }
@@ -529,6 +560,7 @@ inputData.push(networkRow);
 
 //inputData.push(addControlRow('Server'));
 //inputData.push(addControlRow('Database'));
+//networkRow.header = 'Network';
 
 var resumeRow = addControlRow('Auto-Resume Logging','autoResume',false);
 //resumeRow.header = 'Configuration';
@@ -552,7 +584,7 @@ inputData.push(addExportDbRow('Export DB'));
 // Set up an about message
 var aboutString = 
 'Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance. '+
-'Export logs via e-mail in CSV, JSON or Golden Cheetah format. Data can be automatically uploaded while logging to: http://mobilelogger.robertcarlsen.net\n\n'+
+'Export logs via e-mail in CSV, JSON or Golden Cheetah format.\n\n'+
 'By default, logs contain a unique identifier for this device. It may be omitted by enabling the "Anonymous Export" option.\n\n'+
 'This application has been released as open source software under the GPLv3. '+
 'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+

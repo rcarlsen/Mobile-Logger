@@ -60,11 +60,6 @@ var eventDuration = 0;
 var clockInterval = 0;
 var audioListenerInterval = 0;
 
-// TODO: work with the database when generating the upload buffer
-// to record which records have been uploaded
-var uploadBuffer = [];
-var uploadTrigger = 10;
-
 // set up configuration for metric or imperial
 // data should *always* be stored in metric / meters
 // this configuration will only affect display
@@ -77,9 +72,18 @@ var speedUnitValue;
 // end instance vars //
 
 var dashboardView = Ti.UI.createView({
-    size:{width:320,height:win.getHeight()},
+    width:Ti.UI.FILL,
+    height:Ti.UI.FILL,
     backgroundColor:'#ccc',
     top:0,bottom:0
+});
+
+
+// load images:
+var consoleImage = Ti.UI.createImageView({
+    image:'../images/bottom.png',
+    width:320,height:82,
+    bottom:0
 });
 
 
@@ -203,8 +207,8 @@ var accuracyLabel = Ti.UI.createLabel({
 // the container view should fill the window, but then we'll need
 // to be able to reposition the compass / accuracy view within.
 var compassView = Ti.UI.createView({
-    width:320,height:320,
-    center:{x:160,y:170}
+    width:Ti.UI.FILL, // the height will be determined by the top/bottom pins later
+    top:0, bottom:(consoleImage.height-10)
 });
 
 var compass = Ti.UI.createImageView({
@@ -236,19 +240,14 @@ var locationView = Ti.UI.createView({
 
 compassView.add(compass);
 compassView.add(accuracyView);
+
 // doesn't really help right now.
 //compassView.add(locationView);
 
 
 var consoleView = Ti.UI.createView({
-   width:320,height:'auto',
+   width:320,height:Ti.UI.FILL,
    left:0,bottom:0
-});
-
-var consoleImage = Ti.UI.createImageView({
-    image:'../images/bottom.png',
-    width:320,height:82,
-    bottom:0
 });
 
 var forceImage = Ti.UI.createImageView({
@@ -406,6 +405,8 @@ function updateAccuracyView (meters) {
     // create an animation for the accuracy
     // scale? starts at 5k, usually 100-50m
     // map the meters to an appropriate scale
+    
+    if(accuracyView.getAnimating() == true) {return;}
 
     // set up some constraints
     var minMeters = 25;
@@ -417,9 +418,8 @@ function updateAccuracyView (meters) {
     var sc = (((meters-minMeters)/(maxMeters-minMeters)) * (maxPx-minPx) + minPx)/minPx;
 	var t = Titanium.UI.create2DMatrix();
 	t = t.scale(sc + 0.2);
-	accuracyView.animate({transform:t, duration:300},function()
-	{
-		var t = Titanium.UI.create2DMatrix();
+	accuracyView.animate({transform:t, duration:300},function() {
+	    var t = Titanium.UI.create2DMatrix();
         t = t.scale(sc);
 		accuracyView.animate({transform:t, duration:200});
 	});
@@ -450,9 +450,6 @@ function resetValues (restore) {
     // create a hash for this device / user
     deviceID =  Titanium.Utils.md5HexDigest(Ti.Platform.id);
     Ti.API.info('Set device ID: '+deviceID);
-
-    // clear the upload buffer
-    uploadBuffer = [];
 
     if(restore == false) {
         Ti.API.info('Creating a new event log.');
@@ -557,25 +554,6 @@ function recordSample() {
 
     //Titanium.API.info("Current sample recorded to db");
     //Titanium.API.info('Time: '+currentSample.timestamp);
-
-    // upload the sample
-    // DEBUG: testing only
-    // TODO: abstract / buffer this process.
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        // add this sample to the upload buffer:
-        uploadBuffer.push(docID);
-        if(uploadBuffer.length >= uploadTrigger){
-            try{
-                win.sendBuffer({'docBuffer':uploadBuffer,
-                            'eventID':eventID,
-                            'deviceID':deviceID});
-                // clear the buffer
-                uploadBuffer = [];
-            } catch(err) {
-                Ti.API.info('Error uploading the sample buffer: '+err.toLocaleString());    
-            }
-        }
-    }
 };
 
 function updateDistanceLabel (delta) {
@@ -601,22 +579,26 @@ function updateDistanceLabel (delta) {
     distanceLabel.text = parseFloat(displayDistance).toFixed(2);
 }
 
+var compassTransformation = Ti.UI.create2DMatrix();
 function rotateCompass(degrees) {
-	// don't interrupt the current animation
-    // if(compass.animating) { return; }
     
-    var t = Ti.UI.create2DMatrix().rotate(360-parseFloat(degrees));
-    compass.transform = t;
-
-    // ignore the nice rotation for now, just get the compas to move correctly
-    /*
-    var a = Titanium.UI.createAnimation();
-	a.transform = t;
-	a.duration = 100;
-	a.autoreverse = false;
-	a.repeat = 0;
-	compass.animate(a); // TODO: rotate a compass widget instead
-    */
+	// don't interrupt the current animation
+	// TODO: figure out why this seems to be ignored.
+    if(compass.getAnimating() == false) { 
+        var t = compassTransformation;
+        t = t.rotate(360-degrees);
+        
+        // animation is *still* not working correctly. sigh.
+        compass.setTransform(t);
+        return;
+        
+        var a = Titanium.UI.createAnimation({
+           transform:  t,
+           duration:   300
+        });
+        
+        compass.animate(a);
+	}
 }
 
 function updateLocationData(e) {
@@ -747,17 +729,6 @@ function stopLogging() {
 
     clearInterval(clockInterval);
     clockInterval = 0;
- 
-    // push the final samples to the server
-    if(Ti.App.Properties.getBool('uploadEnabled',true)){
-        try{
-            win.sendBuffer({'docBuffer':uploadBuffer,
-                        'eventID':eventID,
-                        'deviceID':deviceID});
-        } catch(err) {
-            Ti.API.info('Error uploading the final buffer: ' + err.toLocaleString());
-        }
-    }
 
     // re-enable the idle timer:
     Ti.App.idleTimerDisabled = false;
@@ -893,7 +864,6 @@ if(Ti.Platform.name == 'iPhone OS') {
 // add the changed objects to the current window
 dashboardView.visible = true;
 Ti.UI.currentWindow.add(dashboardView);
-
 
 
 var reminderLabel = Ti.UI.createLabel({
@@ -1043,9 +1013,8 @@ function checkAudioLevels() {
         if(dbspl >= 90 && audioLevelImage.animating == false) {
             var t = Titanium.UI.create2DMatrix();
             t = t.scale(1.1 + ((dbspl-90)/20)); // scale relative to dbspl
-            audioLevelImage.animate({transform:t, duration:100},function()
-            {
-                var t = Titanium.UI.create2DMatrix();
+            audioLevelImage.animate({transform:t, duration:100},function() {
+                t  = Ti.UI.create2DMatrix();
                 audioLevelImage.animate({transform:t, duration:200});
             });
         }
@@ -1097,7 +1066,7 @@ else
 
 		// SET THE HEADING FILTER (THIS IS IN DEGREES OF ANGLE CHANGE)
 		// EVENT WON'T FIRE UNLESS ANGLE CHANGE EXCEEDS THIS VALUE
-		Titanium.Geolocation.headingFilter = 2;
+		Titanium.Geolocation.headingFilter = 1;
 
 		//  GET CURRENT HEADING - THIS FIRES ONCE
 		Ti.Geolocation.getCurrentHeading(function(e)
@@ -1183,8 +1152,6 @@ else
 	// Titanium.Geolocation.ACCURACY_THREE_KILOMETERS
 	//
 	Titanium.Geolocation.accuracy = Titanium.Geolocation.ACCURACY_BEST;
-
-	//
 	Titanium.Geolocation.distanceFilter = 1;
 
 
@@ -1266,9 +1233,8 @@ Titanium.Accelerometer.addEventListener('update',function(e)
     if(Math.abs(mag) > 1.5 && forceImage.animating == false) {
         var t = Titanium.UI.create2DMatrix();
         t = t.scale(Math.abs(mag));
-        forceImage.animate({transform:t, duration:100},function()
-        {
-            var t = Titanium.UI.create2DMatrix();
+        forceImage.animate({transform:t, duration:100},function() {
+            t = Ti.UI.create2DMatrix();
             forceImage.animate({transform:t, duration:200});
         });
     }
@@ -1310,9 +1276,7 @@ win.addEventListener('open',function() {
     // if not, the setup needs to happen first.
     // maybe in app.js.
     Ti.API.info('In the window open event.');
-    
-    layoutAutoAdjustment();
-    
+        
     // this is done in the app.js file now.
     //setupDatabase();
     
