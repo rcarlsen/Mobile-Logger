@@ -72,9 +72,18 @@ var speedUnitValue;
 // end instance vars //
 
 var dashboardView = Ti.UI.createView({
-    size:{width:320,height:win.getHeight()},
+    width:Ti.UI.FILL,
+    height:Ti.UI.FILL,
     backgroundColor:'#ccc',
     top:0,bottom:0
+});
+
+
+// load images:
+var consoleImage = Ti.UI.createImageView({
+    image:'../images/bottom.png',
+    width:320,height:82,
+    bottom:0
 });
 
 
@@ -198,8 +207,8 @@ var accuracyLabel = Ti.UI.createLabel({
 // the container view should fill the window, but then we'll need
 // to be able to reposition the compass / accuracy view within.
 var compassView = Ti.UI.createView({
-    width:320,height:320,
-    center:{x:160,y:170}
+    width:Ti.UI.FILL, // the height will be determined by the top/bottom pins later
+    top:0, bottom:(consoleImage.height-10)
 });
 
 var compass = Ti.UI.createImageView({
@@ -231,19 +240,14 @@ var locationView = Ti.UI.createView({
 
 compassView.add(compass);
 compassView.add(accuracyView);
+
 // doesn't really help right now.
 //compassView.add(locationView);
 
 
 var consoleView = Ti.UI.createView({
-   width:320,height:'auto',
+   width:320,height:Ti.UI.FILL,
    left:0,bottom:0
-});
-
-var consoleImage = Ti.UI.createImageView({
-    image:'../images/bottom.png',
-    width:320,height:82,
-    bottom:0
 });
 
 var forceImage = Ti.UI.createImageView({
@@ -862,7 +866,6 @@ dashboardView.visible = true;
 Ti.UI.currentWindow.add(dashboardView);
 
 
-
 var reminderLabel = Ti.UI.createLabel({
     height:'auto',
     text:'Dashboard hidden.\nDouble-tap to display',
@@ -873,13 +876,6 @@ var reminderLabel = Ti.UI.createLabel({
 });
 reminderLabel.hide();
 win.add(reminderLabel);
-
-
-// adjust compass center for iPhone 4/5
-function layoutAutoAdjustment() {
-    Ti.API.info("layout auto-adjustment");
-    compassView.setCenter({x:160,y:((win.size.height > 480) ? 220 : 170)});    
-};
 
 
 // toggle the dashboard view transparency
@@ -1273,9 +1269,7 @@ win.addEventListener('open',function() {
     // if not, the setup needs to happen first.
     // maybe in app.js.
     Ti.API.info('In the window open event.');
-    
-    layoutAutoAdjustment();
-    
+        
     // this is done in the app.js file now.
     //setupDatabase();
     
