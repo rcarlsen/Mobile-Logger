@@ -34,6 +34,8 @@ Ti.include('../tools/util.js');
 var win = Ti.UI.currentWindow;
 var detailWindow;
 
+var retinaDisplay = (Ti.Platform.displayCaps.density == 'high');
+
 var imagesPath = Titanium.Filesystem.resourcesDirectory + '/images/';
 
 // add an activity indicator 
@@ -524,6 +526,9 @@ function addMapRow (logData) {
     }
     //Ti.API.info('Created row container');
 
+    // array of point objects for drawing the route polyline
+    // in the form of {latitude:,longitude:}
+    var routePoints = [];
 
     // Create the annotations
     var firstPoint = Titanium.Map.createAnnotation({
@@ -538,6 +543,13 @@ function addMapRow (logData) {
     });
     //Ti.API.info('Added pin at: ('+firstPoint.longitude+','+firstPoint.latitude+')');
     
+    // add the first point to the route point array:
+    routePoints.push({
+        latitude:logData.first.lat,
+        longitude:logData.first.lon
+    });
+    Ti.API.info("pushed the first point to the route array: "+routePoints);
+    
     var lastPoint = Titanium.Map.createAnnotation({
         latitude:logData.last.lat,
         longitude:logData.last.lon,
@@ -550,8 +562,9 @@ function addMapRow (logData) {
     });
     //Ti.API.info('Added pin at: ('+lastPoint.longitude+','+lastPoint.latitude+')');
 
+    
     // now, create all the other annotations.
-    var dataPoints = [];
+    var dataPoints = [];  // annotations
     for (var i = 0; i < logData.data.length; i++) {
         var d = logData.data[i];
         
@@ -573,18 +586,40 @@ function addMapRow (logData) {
             myid:2+i // CUSTOM ATTRIBUTE THAT IS PASSED INTO EVENT OBJECTS
         });
         dataPoints.push(point);
+        
+        var entry = {latitude:d.lat,longitude:d.lon};
+        routePoints.push(entry);
     };
     //Ti.API.info('Created anntations');
 
+    // add the last point to the route point array:
+    routePoints.push({
+        latitude:logData.last.lat,
+        longitude:logData.last.lon
+    });
+    
+    // create the map view:
     var map = Ti.Map.createView({
         width:300,height:mapHeight,
         borderRadius:10,
         borderWidth:1,
         borderColor:'#999',
         touchEnabled:false,
-        annotations: [firstPoint,lastPoint]
+        annotations:[firstPoint,lastPoint]
     });
     //Ti.API.info('Created map view');
+
+
+    // create route object:
+    var route = {
+        name:"Log",
+        points:routePoints,
+        color:"purple",
+        width:(retinaDisplay) ? 8 : 4 // this needs to be adjusted for non-Retina displays  
+    };
+    
+    // add a route
+    map.addRoute(route);
 
     map.userLocation = false;
     //map.annotations = [firstPoint,lastPoint];
@@ -663,6 +698,9 @@ function addMapRow (logData) {
 
         // add all the other annotations
         bigMap.annotations = dataPoints;
+        
+        // add the route line
+        bigMap.addRoute(route);
 
         mapwin.add(bigMap);
         //Ti.API.info('added the map view to the new map window');
@@ -867,7 +905,6 @@ function displayDetail(rowData) {
         // set up and display an action sheet with upload choices:
         var optionsDialog = Titanium.UI.createOptionDialog({
            options:['Upload', 'Email', 'Cancel'],
-           //destructive:2,
            cancel:2,
            title:'Export Log'
         });
