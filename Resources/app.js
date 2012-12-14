@@ -24,6 +24,19 @@ Ti.include('main_windows/api.js');
 
 setupDatabase();
 
+// only here for testing.
+// these properties should not be embedded in the source
+var GoogleAuth = require('modules/googleAuth');
+var googleAuth = new GoogleAuth({
+    clientId : 'clientID',
+    clientSecret : 'clientSecret',
+    propertyName : 'googleToken',
+    quiet: false,
+    //scope : ['https://www.googleapis.com/auth/fusiontables']
+    scope : ['https://www.googleapis.com/auth/tasks', 'https://www.googleapis.com/auth/tasks.readonly', 'https://www.googleapis.com/auth/fusiontables']
+});
+
+
 // clear the Google session token:
 Ti.App.Properties.setString('googleClientLoginAuth','');
 
@@ -35,95 +48,13 @@ Ti.Geolocation.purpose = "Log location, movement and sound.";
 // this sets the background color of the master UIView (when there are no windows/tab groups on it)
 Titanium.UI.setBackgroundColor('#000');
 
-//var greenColor = 'rgb(85,130,80)';
-//var orangeColor = '#f27f14';
-var orangeColor = '#d56009';
-var blueColor = '#c8e6ff';
 
-// create tab group
-var tabGroup = Titanium.UI.createTabGroup();
-//tabGroup.backgroundColor=greenColor;
-
-//
-// create base UI tab and root window
-//
-var win1 = Titanium.UI.createWindow({  
-    url:'main_windows/dashboardView.js',
-    // title:'Dashboard',
-    backgroundColor:'#ccc',
-    navBarHidden:true
-});
+// TODO: require the tabGroup file.
+//require and open top level UI component
+var AppTabGroup = require('main_windows/AppTabGroup');
+new AppTabGroup().open();
 
 
-var tab1 = Titanium.UI.createTab({  
-    icon:'map-tab-icons.png',
-    title:'Dashboard',
-    window:win1
-});
-
-//
-// create controls tab and root window
-//
-var win2 = Titanium.UI.createWindow({  
-    url:'main_windows/logList.js',
-    title:'Logs',
-    backgroundColor:'#ccc',
-    barColor:orangeColor
-});
-var tab2 = Titanium.UI.createTab({  
-    icon:'list-tab-icons.png',
-    title:'Logs',
-    window:win2
-});
-
-//
-// Settings Tab 
-//
-var winSettings = Titanium.UI.createWindow({  
-    url:'main_windows/settings.js',
-    title:'Settings',
-    backgroundColor:'#ccc',
-    barColor:orangeColor
-});
-var tabSettings = Titanium.UI.createTab({  
-    icon:'settings_tab.png',
-    title:'Settings',
-    window:winSettings
-});
-
-
-
-//
-//  add tabs
-//
-tabGroup.addTab(tab1);
-tabGroup.addTab(tab2);  
-tabGroup.addTab(tabSettings);
-
-
-// open tab group
-tabGroup.open();
-
-
-// FIX: I don't think this is going to work.
-// set up a function to hide everything
-//var windowShade = Ti.UI.createWindow({
-//    backgroundColor:'#000',
-//    fullscreen:true
-//});
-//
-//function toggleDisplayVisibility (state) {
-//    // toggle if no input.
-//    if(state == null) {
-//        state = !windowShade.visible;
-//    }
-//    if(state === true) {
-//        windowShade.show();
-//    } else if (state === false) {
-//        windowShade.hide();
-//    }
-//}
-//
 // Moved this to app.js to try to get the uploading on a different thread than the UI
 function sendBuffer(d) {
     // d is an object with the doc buffer, eventID and deviceID.
@@ -189,4 +120,5 @@ function sendBuffer(d) {
 
 // attach the sendBuffer method.
 // is this the correct way?
-win1.sendBuffer = sendBuffer;
+// TODO: repair this. win1 is the dashboard view.
+//win1.sendBuffer = sendBuffer;
