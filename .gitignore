@@ -1,4 +1,5 @@
 build/*
 Distribution/*
 device_uuids.txt
+keys.js
 
