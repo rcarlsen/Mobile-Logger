@@ -19,29 +19,47 @@
  * 
  */
 
+// Not committed to the repo. Contains service keys.
+Ti.include('keys.js');
+// --- //
+
 Ti.include('tools/util.js');
 Ti.include('main_windows/api.js');
 
-setupDatabase();
+Ti.include('tools/date.format.js');
+Ti.include('tools/util.js');
+Ti.include('tools/xml.js');
+
+Ti.include('main_windows/export.js');
+
+var orangeColor = '#d56009';
+var blueColor = '#c8e6ff';
 
 // only here for testing.
 // these properties should not be embedded in the source
 var GoogleAuth = require('modules/googleAuth');
 var googleAuth = new GoogleAuth({
-    clientId : 'clientID',
-    clientSecret : 'clientSecret',
+    clientId : GoogleAPI.clientId,
+    clientSecret : GoogleAPI.clientSecret,
     propertyName : 'googleToken',
     quiet: false,
-    //scope : ['https://www.googleapis.com/auth/fusiontables']
-    scope : ['https://www.googleapis.com/auth/tasks', 'https://www.googleapis.com/auth/tasks.readonly', 'https://www.googleapis.com/auth/fusiontables']
+    scope : ['https://www.googleapis.com/auth/fusiontables', 'https://www.googleapis.com/auth/fusiontables.readonly']
 });
 
+// anti-pattern...but trying to test other things first:
+Ti.App.googleAuth = googleAuth;
 
-// clear the Google session token:
-Ti.App.Properties.setString('googleClientLoginAuth','');
 
+setupDatabase();
+
+// TODO: get rid of this.
 // #dev only. clear the table, it will fallback on the dev table.
 Ti.App.Properties.removeProperty('googleFusionTableID');
+
+// upgrade..if the upload function is mobile logger, clear the property:
+if('mobileLogger' === Ti.App.Properties.getString('uploadService')) {
+    Ti.App.Properties.removeProperty('uploadService');
+}
 
 Ti.Geolocation.purpose = "Log location, movement and sound.";
 
@@ -55,70 +73,3 @@ var AppTabGroup = require('main_windows/AppTabGroup');
 new AppTabGroup().open();
 
 
-// Moved this to app.js to try to get the uploading on a different thread than the UI
-function sendBuffer(d) {
-    // d is an object with the doc buffer, eventID and deviceID.
-    if(d == null) {return;}
-    if(!d.hasOwnProperty('docBuffer') || d.docBuffer == null || d.docBuffer.length == 0) { return; }
-
-    //Ti.API.info('In the sendBuffer() method with: '+ d.docBuffer.toString() +
-                //', eventid: '+d.eventID+
-                //', deviceid: '+d.deviceID);
-
-    //Ti.API.info('Sending Buffer');
-    // send the batch of docIDs in the docBuffer
-    // need to retrieve them from the database 
-    var logDB = Ti.Database.open("log.db");
- 
-    // using an array just isn't working, despite the documentation
-    //var rows = logDB.execute("SELECT _id,DATA FROM LOGDATA WHERE _id IN (?)",docString);
-
-    // instead, manually construct the SQL statement
-    var docString = d.docBuffer.join("','");
-    var sql = "SELECT * FROM LOGDATA WHERE _id IN ('"+docString+"')";
-    var rows = logDB.execute(sql);
-    
-    var docs = [];
-    var useDeviceID = Ti.App.Properties.getBool('omitDeviceID',false);
-    
-    while(rows.isValidRow()) {
-        // get the data from the row
-        var thisDoc = JSON.parse(rows.fieldByName('DATA'));
-       
-        // disabled at the moment, but ensure that uploaded records are numbers, not strings
-        // make sure that each field is a number
-        //for(var f in currentSample){
-        //    out[f] = parseFloat(currentSample[f]);
-        //}
-       
-        // add the docid
-        thisDoc._id = rows.fieldByName('_id');
-        // add the eventID
-        thisDoc.eventID = (d.hasOwnProperty('eventID')) ? d.eventID : -1;
-        // and the deviceID
-        if(!useDeviceID){
-            thisDoc.deviceID = (d.hasOwnProperty('deviceID')) ? d.deviceID : -1;
-        } else {
-            thisDoc.deviceID = -1;
-        }
-        docs.push(thisDoc);
-
-        //Ti.API.info(JSON.stringify(thisDoc));
-        rows.next();
-    }
-    rows.close();
-    logDB.close();
-
-    //Ti.API.info('Prepared docs for upload: '+docs.length);
-
-    // send this batch of samples
-    bulkUpload(docs);
-
-    //Ti.API.info('Finished upload');
-}
-
-
-// attach the sendBuffer method.
-// is this the correct way?
-// TODO: repair this. win1 is the dashboard view.
-//win1.sendBuffer = sendBuffer;
