@@ -195,19 +195,25 @@ var GoogleAuth = function(o) {
 					cb();
 					//w.remove(webview);
 				}, 500);
-				Ti.App.Properties.setString(_opt.propertyName + '.accessToken', '');
-				Ti.App.Properties.setString(_opt.propertyName + '.refreshToken', '');
-				Ti.App.Properties.setString(_opt.propertyName + '.tokenType', '');
-				Ti.App.Properties.setString(_opt.propertyName + '.expiresIn', 0);
-				_prop.accessToken = null;
-				_prop.refreshToken = null;
-				_prop.tokenType = null;
-				_prop.expiresIn = 0;
+                clearTokens();
 			});
 			logoutWin.open();
 		}
 	}
-
+	
+	// don't really want to open the webview to clear the tokens.
+	// the logout flow is not really clear in the Google OAuth 2.0 spec.
+    function clearTokens() {
+        Ti.App.Properties.removeProperty(_opt.propertyName + '.accessToken');
+        Ti.App.Properties.removeProperty(_opt.propertyName + '.refreshToken');
+        Ti.App.Properties.removeProperty(_opt.propertyName + '.tokenType');
+        Ti.App.Properties.removeProperty(_opt.propertyName + '.expiresIn');
+        _prop.accessToken = null;
+        _prop.refreshToken = null;
+        _prop.tokenType = null;
+        _prop.expiresIn = 0;
+    }
+    
 	/**
 	 * Refresh token
 	 */
@@ -239,18 +245,16 @@ var GoogleAuth = function(o) {
 				log.info(e.responseText);
 				cbError();
 				//ERROR
-				Titanium.UI.createAlertDialog({
-					title : 'Error',
-					message : _opt.errorText
-				});
-				cbError();
+				// Titanium.UI.createAlertDialog({
+					// title : 'Error',
+					// message : _opt.errorText
+				// }).show();
 				//authorize();
-
 			},
 			timeout : 5000 /* in milliseconds */
 		});
 		// Prepare the connection.
-		xhr.open("POST", _opt.url);
+		xhr.open("POST", 'https://accounts.google.com/o/oauth2/token'); // TODO: add this url to the opts
 		xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 		var d = {
 			client_id : _opt.clientId,
@@ -301,7 +305,7 @@ var GoogleAuth = function(o) {
 				}).show();
 				win.close();
 			},
-			timeout : 60000 /* in milliseconds */
+			timeout : 5000 /* in milliseconds */
 		});
 		// Prepare the connection.
 		xhr.open("POST", 'http://accounts.google.com/o/oauth2/token');
@@ -362,7 +366,8 @@ var GoogleAuth = function(o) {
 		getAccessToken : getAccessToken,
 		refreshToken : refreshToken,
 		authorize : authorize,
-		version : _version
+		version : _version,
+		clearTokens: clearTokens
 	}
 };
 
