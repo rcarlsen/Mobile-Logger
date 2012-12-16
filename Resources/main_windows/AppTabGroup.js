@@ -4,7 +4,8 @@ var blueColor = '#c8e6ff';
 function AppTabGroup() {
     //declare module dependencies
     var SettingsWindow = require('main_windows/settings');
-
+    var LogWindow = require('main_windows/logList');
+    
     // create tab group
     var self = Titanium.UI.createTabGroup();
     
@@ -26,18 +27,13 @@ function AppTabGroup() {
     });
     
     //
-    // create controls tab and root window
+    // Log list Tab
     //
-    var win2 = Titanium.UI.createWindow({  
-        url:'main_windows/logList.js',
-        title:'Logs',
-        backgroundColor:'#ccc',
-        barColor:orangeColor
-    });
-    var tab2 = Titanium.UI.createTab({  
+    var winLogs = new LogWindow('Logs');
+    var tabLogs = Titanium.UI.createTab({
         icon:'list-tab-icons.png',
         title:'Logs',
-        window:win2
+        window:winLogs
     });
     
     //
@@ -49,13 +45,12 @@ function AppTabGroup() {
         title:'Settings',
         window:winSettings
     });
-    winSettings.containingTab = tabSettings;
     
     //
     //  add tabs
     //
     self.addTab(tab1);
-    self.addTab(tab2);  
+    self.addTab(tabLogs);  
     self.addTab(tabSettings);
     
     return self;

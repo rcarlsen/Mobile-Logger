@@ -24,10 +24,14 @@
 // in order to do anything useful with it.
 //
 
-// Ti.include('json2.js');
-Ti.include('../tools/xml.js');
-Ti.include('../tools/util.js');
-Ti.include('../tools/date.format.js');
+// the dependencies have been moved to app.js
+
+// TODO: ?
+// json export
+// this is used for pushing to couchdb?
+// if each piece of data is expanded into a column in the db,
+// then each will have to be reconstituted into objects / json for sending
+// this will be useful when the database has the data alone.
 
 
 // csv export
@@ -39,15 +43,11 @@ Ti.include('../tools/date.format.js');
 // this would be much easier if the data was just in the database columns.
 // then, a request from the db would be in order.
 
-
-// json export
-// this is used for pushing to couchdb?
-// if each piece of data is expanded into a column in the db,
-// then each will have to be reconstituted into objects / json for sending
-// this will be useful when the database has the data alone.
-function exportCSV (data) {
+function exportCSV (data, includeHeaders) {
     Ti.API.info('Inside CSV export function');
-
+    
+    // preserve the original behavior:
+    includeHeaders = (includeHeaders === undefined) ? true : includeHeaders;
     var headers = [];
 
     var rows = [];
@@ -76,7 +76,9 @@ function exportCSV (data) {
         // what will happen to the first rows, which may be shorter than others?
     };
     // add the header row
-    rows.unshift(headers.join(', '));
+    if(includeHeaders) {
+        rows.unshift(headers.join(', '));        
+    }
     return rows.join('\n');
 }
 

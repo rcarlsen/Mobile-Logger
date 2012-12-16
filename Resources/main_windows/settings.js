@@ -22,14 +22,8 @@
 /* Settings window
 */
 
-// The Android can't do a grouped table layout but it does have sections.
-// Also, I don't think that it can have controls in the table rows, can it?
-//
-
-var orangeColor = '#d56009';
 
 function SettingsWindow(title) {
-    Ti.API.info(Ti.UI.getCurrentTab());
     
     var self = Ti.UI.createWindow({
         navBarHidden: true
@@ -422,7 +416,7 @@ function SettingsWindow(title) {
     }
     
     
-    // add network row. mobile logger server or google fusion tables
+    // add network row. currently only google fusion tables (but leaving the mechanism to add network services later)
     function addNetworkRow(label,property,valuesList,initialValue)
     {
         if(initialValue == null) { initialValue = false; }
@@ -463,11 +457,69 @@ function SettingsWindow(title) {
                     backgroundColor: '#ccc',
                     barColor:orangeColor
                 });
-    
+                
                 var thisTable = Ti.UI.createTableView();
                 thisTable.style = Ti.UI.iPhone.TableViewStyle.GROUPED;
                 thisTable.backgroundColor = '#ccc';
                 var data = [];
+                
+                var clearButton = Ti.UI.createButton({
+                    title: "Clear"
+                });
+                clearButton.addEventListener('click',function(e){
+
+                    function clearUploadService() {
+                        // remove the uploadService property.
+                        // deactivate all auth...currently only google auth
+                        
+                        googleAuth.clearTokens();
+                        Ti.App.Properties.removeProperty('uploadService');
+                            
+                        // clear the network row cell label value:
+                        cellValue.text = '';
+                        row.value = '';
+                        
+                        // reset checks
+                        // only 1 section
+                        for (var i=0;i<data.length;i++) {
+                            data[i].hasCheck = false;
+                        }
+                        thisTable.setData(data);
+                    }
+                    
+                    // display an action sheet to confirm
+                    // set up and display an action sheet with upload choices:
+                    var optionsDialog = Titanium.UI.createOptionDialog({
+                        options : ['Clear', 'Cancel'],
+                        cancel : 1,
+                        destructive: 0,
+                        title : 'Remove upload service?'
+                    });
+
+                    // TODO: add a listener to conditionally act on the response.
+                    // This may be better suited to display differently based on each platform's
+                    // UX paradigms.
+                    optionsDialog.addEventListener('click', function(oe) {
+                        switch(oe.index) {
+                            case oe.destructive:
+                                // clear the upload service, and log out of Google
+                                Ti.API.info('Button 0 pressed.');
+                                clearUploadService();
+                                break;
+                            case oe.cancel:
+                                Ti.API.info('Cancel button pressed');
+                                break;
+                            default:
+                                Ti.API.info('Default case in options dialog.');
+                                return;
+                        }
+                    }); 
+
+                   // Ti.API.info('Showing the options dialog');
+                   optionsDialog.show();
+                });
+                exportWin.setRightNavButton(clearButton);
+                
                 for(var i in valuesList) {
                     if(valuesList.hasOwnProperty(i)){
                         var thisRow = Ti.UI.createTableViewRow({backgroundColor:'#fff'});
@@ -478,48 +530,18 @@ function SettingsWindow(title) {
                         if(row.value == thisRow.value) { thisRow.hasCheck = true; }
                         data.push(thisRow);
                         
-                        // add the authentication fields in a new window:
                         if(i == 'fusionTables') {
-                            thisRow.hasDetail = true;
-                            
-                            thisRow.addEventListener('click',function(r){
-                               // only act when the detail disclosure is clicked, or if the account fields are empty
-                               if(r.detail ||
-                                    (Ti.App.Properties.getString('googleUsername') == '' ||
-                                     Ti.App.Properties.getString('googlePassword') == '')) { 
-                                    var acctWin = Ti.UI.createWindow({
-                                        title:'Google account',
-                                        backgroundColor: '#ccc',
-                                        barColor:orangeColor
-                                    });
-                                    var acctTable = Ti.UI.createTableView();
-                                    acctTable.style = Ti.UI.iPhone.TableViewStyle.GROUPED;
-                                    acctTable.backgroundColor = '#ccc';
-                                    var acctData = [];
-    
-                                    var nameRow = addTextFieldRow('Username','googleUsername','Google username');
-                                    var passRow = addTextFieldRow('Password','googlePassword','Google password',true);
-                                    passRow.footer = 'Provide Google Account information';
-    
-                                    acctData.push(nameRow);
-                                    acctData.push(passRow);
-    
-                                    acctTable.setData(acctData);
-    
-                                    // TODO: add click listener to this table
-                                    acctWin.add(acctTable);
-                                    nav.open(acctWin,{animated:true});
-                                }
-                            });
-                        }
-                        if(i == 'fusionTablesOAuth') {
                             Ti.API.log('in fusion tables OAuth');
+                            
+                            // add a custom footer with a descriptive link
+                            //Ti.Platform.openURL('http://support.google.com/fusiontables/answer/2571232/?hl=en');
+                            thisRow.footer = "http://support.google.com/fusiontables/answer/2571232/?hl=en";
                             
                             thisRow.addEventListener('click',function(r){
     
                                  // ensure logged in:
                                 var acctWin = Ti.UI.createWindow({
-                                    title:'Google auth',
+                                    title:'Fusion Tables',
                                     backgroundColor: '#ccc',
                                     barColor:orangeColor
                                 });
@@ -537,7 +559,6 @@ function SettingsWindow(title) {
                             
                                 logout.addEventListener('click', function() {
                                     googleAuth.deAuthorize();
-                                    //googleAuth.refreshToken();
                                     table.setData([]);
                                 });
                                 sync.addEventListener('click', function() {
@@ -552,31 +573,12 @@ function SettingsWindow(title) {
                                                 try {
                                                     var resp = JSON.parse(this.responseText);
                                                     for (var i = 0; i < resp.items.length; i++) {
-                                                        //GET DATA FOR LIST
-                                                        var xhrTasks = Ti.Network.createHTTPClient({
-                                                            // function called when the response data is available
-                                                            onload : function(e) {
-                                                                var resp = JSON.parse(this.responseText);
-                                                                for (var j = 0; j < resp.items.length; j++) {
-                                                                    if (resp.items[j].title != '') {
-                                                                        var row = Titanium.UI.createTableViewRow({
-                                                                            title : resp.items[j].title
-                                                                        });
-                                                                        table.appendRow(row);
-                                                                    }
-                                                                }
-                                                            },
-                                                            // function called when an error occurs, including a timeout
-                                                            onerror : function(e) {
-                                                                Titanium.UI.createAlertDialog({
-                                                                    title : 'Error',
-                                                                    message : 'Can\'t load tasks for list ' + resp[i].title
-                                                                });
-                                                            },
-                                                            timeout : 5000
+                                                        // get each of the table names:
+                                                        var name = resp.items[i].name;
+                                                        var row = Ti.UI.createTableViewRow({
+                                                           title: (name) ? name : '(no name)'
                                                         });
-                                                        xhrTasks.open("GET", 'https://www.googleapis.com/tasks/v1/lists/' + resp.items[i].id + '/tasks?access_token=' + googleAuth.getAccessToken());
-                                                        xhrTasks.send();
+                                                        table.appendRow(row);
                                                     }
                                                 } catch(e) {
                                                     Titanium.UI.createAlertDialog({
@@ -596,7 +598,7 @@ function SettingsWindow(title) {
                                             },
                                             timeout : 5000
                                         });
-                                        xhrList.open("GET", 'https://www.googleapis.com/tasks/v1/users/@me/lists?access_token=' + googleAuth.getAccessToken());
+                                        xhrList.open("GET", 'https://www.googleapis.com/fusiontables/v1/tables?access_token=' + googleAuth.getAccessToken());
                                         xhrList.send();
                                     }, function() {
                                         Ti.API.info('Authorize google account...');
@@ -656,10 +658,8 @@ function SettingsWindow(title) {
     
     var networkServiceRow = addNetworkRow('Upload Service','uploadService',
     {
-        fusionTables:'Google Fusion Tables (CL)',
-        fusionTablesOAuth:'Google Fusion Tables (OA)',
-        mobileLogger:'Mobile Logger (deprecated)'
-    },'mobileLogger');
+        fusionTables:'Google Fusion Tables',
+    }); // no initial value. respond to the absence of the upload service row with an alert 
         
     networkServiceRow.footer = 'Send data to a network service';
     inputData.push(networkServiceRow);
@@ -694,7 +694,9 @@ function SettingsWindow(title) {
     'By default, logs contain a unique identifier for this device. It may be omitted by enabling the "Anonymous Export" option.\n\n'+
     'This application has been released as open source software under the GPLv3. '+
     'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+
-    'Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.';
+    'Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.\n\n'+
+    'Google Authentication Module, Copyright 2012 Miroslav Magda. Licensed with GPL/MIT.'
+    ;
     
     inputData.push(addAboutRow('About Mobile Logger',aboutString));
     
