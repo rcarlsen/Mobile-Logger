@@ -59,12 +59,10 @@ var columnMap = [
 
 
 
-function packageFusionTablesRequest(samples, useSQL) {
+function packageFusionTablesRequest(samples, useSQL, tableID) {
     if(samples == null || samples.length == 0) { return; }
     if(useSQL === undefined) {useSQL = false};
-
-    // test table id:
-    var tableID = Ti.App.Properties.getString('googleFusionTableID');
+    if(useSQL && tableID === undefined) { return; } else { tableID = ''; }
  
     // prepare the rows or build the insert sql statement
     var statements = [];
@@ -211,6 +209,72 @@ function makeFusionTablesMetaRequest(_sql, callback) {
 }
 
 
+// callback provides the tableID:
+function createFusionTable(tableName, callback) {
+
+    if (tableName == null || tableName == '') {
+        tableName = "Mobile Logger";
+    }
+
+    var my = this;
+    this._xhr = Titanium.Network.createHTTPClient();
+
+    my._xhr.onload = function(e) {
+        Ti.API.info('Create table success: ' + my._xhr.responseText);
+
+        // this is where we should get the tableid.
+        var r = JSON.parse(my._xhr.responseText);
+        var tableID = r.tableId;
+        if (tableID) {
+            Ti.API.info('just got a fusion table id: ' + tableID);
+            
+            if (callback != null) {
+                // kick off the upload
+                callback(tableID);
+            }
+        }
+
+        return my._xhr.responseText;
+    };
+
+    my._xhr.onerror = function(e) {
+        Ti.API.info('Create table status: ' + my._xhr.status + ' error: ' + my._xhr.responseText);
+        return my._xhr.responseText;
+    };
+
+    this.makeRequest = function() {
+        var _columns = columnMap.map(function(v) {
+            return v.column;
+        });
+
+        var data = {
+            name : tableName,
+            description : 'Mobile Logger data', // TODO: have a better way to add/configure this data
+            isExportable : true,
+            columns : _columns
+        };
+
+        Ti.API.info(data);
+
+        my._xhr.open("POST", "https://www.googleapis.com/fusiontables/v1/tables");
+        my._xhr.setRequestHeader('Content-Type', 'application/json');
+        my._xhr.setRequestHeader('Authorization', 'Bearer' + ' ' + googleAuth.getAccessToken());
+
+        my._xhr.send(JSON.stringify(data));
+    };
+
+    googleAuth.isAuthorized(function() {// success, including refreshing the access token.
+        my.makeRequest();
+    }, function() {// failure
+        // need to get the googleAuth object to authorize
+        Ti.UI.createAlertDialog({
+            title : "Not Authorized",
+            message : "Please sign in to your Google account in Settings."
+        }).show();
+    });
+}
+
+
 function uploadManager(win) {
     Ti.API.info('In the uploadManager constructor');
 
@@ -220,111 +284,7 @@ function uploadManager(win) {
 
     // expose a way to make a new table:
     this.createNewTable = function(_tableName, _callback) {
-        tableName = _tableName;
-        callback = _callback;
-        
-        if(tableName == null || tableName == '') {
-            tableName = "Mobile Logger";
-        }
-    
-        var my = this;
-        this._xhr = Titanium.Network.createHTTPClient();
-        
-        my._xhr.onload = function(e)
-        {
-            Ti.API.info('Create table success: '+my._xhr.responseText);
-    
-            // this is where we should get the tableid.
-            var r = JSON.parse(my._xhr.responseText);
-            var tableID = r.tableId;
-            if(tableID) { 
-                
-                // TODO: this table id should not be stored locally...
-                // but likely passed to the callback function
-                Ti.App.Properties.setString('googleFusionTableID',tableID);
-                Ti.API.info('just set the fusion table id to: ' +tableID);
-    
-                if(callback != null) {
-                    // kick off the upload
-                    callback(tableID);
-                }
-            }
-           
-            return my._xhr.responseText;
-        };
-    
-        my._xhr.onerror = function(e)
-        {
-            Ti.API.info('Create table status: '+ my._xhr.status +' error: '+my._xhr.responseText);
-            return my._xhr.responseText;
-        };
-    
-    
-        this.makeRequest = function() {
-             var _columns = columnMap.map(function(v) {
-               return v.column;
-             });
-    
-            var data = {
-                name: tableName,
-                description: 'Mobile Logger data', // TODO: have a better way to add/configure this data
-                isExportable: true,
-                columns : _columns 
-            };
-            
-            Ti.API.info(data);
-            
-            my._xhr.open("POST","https://www.googleapis.com/fusiontables/v1/tables");
-            my._xhr.setRequestHeader('Content-Type', 'application/json');
-            my._xhr.setRequestHeader('Authorization', 'Bearer' +' '+ googleAuth.getAccessToken());
-    
-            my._xhr.send(JSON.stringify(data));
-        };
-    
-        googleAuth.isAuthorized(
-            function() { // success, including refreshing the access token.
-                my.makeRequest();
-            },
-            function() { // failure
-                // need to get the googleAuth object to authorize
-                Ti.UI.createAlertDialog({
-                    title: "Not Authorized",
-                    message: "Please sign in to your Google account in Settings."
-                }).show();
-            });
-    };
-
-    this.bulkUpload = function(_data) {
-        if(_data == null || _data.length == 0) { return; }
-
-        // start the progress meter
-        Ti.API.info('About to tell app to create a new progress bar');
-        my.uploadProgress({value:0});
-
-        my._xhr.onload = function(e)
-        {
-            Ti.API.info('Upload success: '+my._xhr.status);
-            return e.responseText;
-        };
-
-        my._xhr.onerror = function(e)
-        {
-            my.uploadProgress({status:-1});
-
-            //Ti.API.info('Upload status: '+ my._xhr.status +' error: '+my._xhr.responseText);
-            Ti.API.info('Upload status: '+ JSON.stringify(e));
-            return my._xhr.responseText;
-        };
-
-        my._xhr.onsendstream = function(e)
-        {
-            my.uploadProgress({value:e.progress});
-        };
-
-        var out = {docs:_data};
-        my._xhr.setTimeout = 120000; // try 2 minutes.
-        my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
-        my._xhr.send("data="+JSON.stringify(out));
+       createFusionTable(_tableName, _callback);
     };
 
     var progress;
@@ -337,7 +297,15 @@ function uploadManager(win) {
 
     this.bulkUploadBatch = function(samples, tableID) {
         if(samples == null || samples.length == 0) { return; }
-        if(tableID === undefined) { tableID = Ti.App.Properties.getString("googleFusionTableID"); /* TODO: just let this method make a new table if necessary. */ } 
+        if(tableID === undefined) { 
+            Ti.UI.createAlertDialog({
+                title: 'Upload Error',
+                message: 'Table ID not specified. Try again later.'
+            }).show();
+            return;
+            
+            // TODO: create a new table and continue if the tableID is not specified.
+        } 
         
         var range = {index: 0, length: 300};
         if(range.length > samples.length) {range.length = samples.length;}
@@ -357,8 +325,9 @@ function uploadManager(win) {
 
             my.uploadProgress({value:pmeter});
 
+            // recursion:
             if(samples.length > range.length) {
-                my.bulkUploadBatch(samples.slice(range.length-1));
+                my.bulkUploadBatch(samples.slice(range.length-1), tableID);
             }
             else {
                 // done with the upload
@@ -392,10 +361,7 @@ function uploadManager(win) {
             
         // google fusion tables:
         if (Ti.App.properties.getString('uploadService') == 'fusionTables') {
-            // don't need to prepare sql statements...but do need to send the rows as csv data.
-            //var statements = packageFusionTablesRequest(samples.slice(range.index,range.length)); 
-            
-            // don't include headers here.
+            // don't need to prepare sql statements...but do need to send the rows as csv data.            
             // will have to insure that the ordering here matches the order of when the table was created.
             var csvData = packageFusionTablesRequest(samples.slice(range.index,range.length), false);
 
@@ -420,12 +386,8 @@ function uploadManager(win) {
 
         }
         else {
-            // mobile logger server:
-            var out = {docs:samples.slice(range.index,range.length)};
-
-            my._xhr.setTimeout = 20000;
-            my._xhr.open("POST","http://mobilelogger.robertcarlsen.net/api/addSamples");
-            my._xhr.send("data="+JSON.stringify(out));
+            // NOP
+            // no other upload services are currently defined.
         }
     };
 
@@ -460,7 +422,7 @@ function uploadManager(win) {
 
             Ti.API.info('Creating the upload progress bar');
             my.progressBar = Titanium.UI.createProgressBar({
-                top:5,
+                top:7,
                 width:260,
                 left: 10,
                 min:0,
@@ -540,8 +502,10 @@ function uploadManager(win) {
     };
 }
 
-// Moved this to app.js to try to get the uploading on a different thread than the UI
+
 function sendBuffer(d) {
+    return; // the upload method is not implemented
+    
     // d is an object with the doc buffer, eventID and deviceID.
     if(d == null) {return;}
     if(!d.hasOwnProperty('docBuffer') || d.docBuffer == null || d.docBuffer.length == 0) { return; }
@@ -591,7 +555,7 @@ function sendBuffer(d) {
     logDB.close();
 
     // send this batch of samples
-    bulkUpload(docs); // <-- this is no longer defined...it's in the manager class.
-
+    // bulkUpload(docs); // <-- this is no longer defined...it's in the manager class.
+    // TODO: use the upload manager, but in a silent way (no progress indicator)
 }
 

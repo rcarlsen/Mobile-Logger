@@ -75,7 +75,7 @@ function LogWindow(title) {
         if(format == 'upload' && 'undefined' == Ti.App.Properties.getString('uploadService',"undefined")) {
             Ti.UI.createAlertDialog({
                 title:   'Not configured',
-                message: 'Please setup the upload service in Settings.'
+                message: 'Please set up the upload service in Settings.'
             }).show();
             return;
         }
@@ -199,7 +199,7 @@ function LogWindow(title) {
                 if (Ti.App.Properties.getString('uploadService') == 'fusionTables') {
                     
                     // this is for the "meta" index table...which can be used to aggregate the individual log tables.
-                    // disabling for now....but the meta requests need to be updated to the new API / authentication
+                    // disabling for now....the meta requests need to be updated to the new API / authentication
                     /*
                     var metaStuff = {
                         'description':'Mobile Logger Data',
@@ -215,11 +215,13 @@ function LogWindow(title) {
                         manager.createNewTable(tableName,function(tableID) { manager.bulkUploadBatch(tmpData, tableID); });
                     }
                     else {
+                        // will need to specify a table id here...store it in the local META table?
                         manager.bulkUploadBatch(tmpData);
                     }
                 }
                 else {
-                        manager.bulkUploadBatch(tmpData);
+                        // NOP ...no other services currently defined.
+                        return;
                 }
                 Ti.API.info('just started a bulk upload');
             } catch(err) {

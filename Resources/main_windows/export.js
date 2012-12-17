@@ -19,16 +19,15 @@
  * 
  */
 
+// the dependencies have been moved to app.js
+
 // export log data from the database in a variety of formats
 // currently it's in the db in JSON format, so each row will have to be parsed
 // in order to do anything useful with it.
-//
 
-// the dependencies have been moved to app.js
 
-// TODO: ?
-// json export
-// this is used for pushing to couchdb?
+// json export ...nothing is needed to be done...the data is natively json
+// this is (was) used for pushing to couchdb.
 // if each piece of data is expanded into a column in the db,
 // then each will have to be reconstituted into objects / json for sending
 // this will be useful when the database has the data alone.
