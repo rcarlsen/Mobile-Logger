@@ -453,7 +453,7 @@ function SettingsWindow(title) {
                Ti.API.info('In the network row click event');
     
                 var exportWin = Ti.UI.createWindow({
-                    title:'Select service',
+                    title:'Setup service',
                     backgroundColor: '#ccc',
                     barColor:orangeColor
                 });
@@ -461,7 +461,41 @@ function SettingsWindow(title) {
                 var thisTable = Ti.UI.createTableView();
                 thisTable.style = Ti.UI.iPhone.TableViewStyle.GROUPED;
                 thisTable.backgroundColor = '#ccc';
+                thisTable.setScrollable(false);
                 var data = [];
+
+                var footerView = Ti.UI.createView({
+                    width: Ti.UI.FILL,
+                    heigth: Ti.UI.SIZE
+                });
+                
+                var infoView = Ti.UI.createTextArea({
+                    backgroundColor: 'transparent',
+                    color : '#333',
+                    font : { fontSize : 12 },
+                    textAlign : Ti.UI.TEXT_ALIGNMENT_CENTER,
+                    autoLink : Ti.UI.AUTODETECT_ALL,
+                    editable : false,
+                    top : 0,
+                    width : 300,
+                    height : Ti.UI.SIZE
+                });
+
+                // provide some information here:                
+                infoView.value = 
+                'Upload logs to Fusion Tables, an experimental Google Labs product. ' +
+                'Fusion Tables appear in your Google Drive account. ' +
+                'You can map your data, chart it in various ways, merge several tables and share. \n\n' +
+                'Sign into your Google account by tapping the Google Fusion Tables button above. \n\n' +
+                'Mobile Logger does not store your account login information; access is provided via OAuth 2.0. ' +
+                'You can remove Mobile Logger\'s tokens by tapping the "Clear" button and can revoke access in your Google account settings. \n\n' +
+                'More information about Fusion Tables is available on the Google support site:\n' +
+                'http://goo.gl/c9ex8'
+                ;
+                
+                footerView.add(infoView);
+                thisTable.setFooterView(footerView);
+                
                 
                 var clearButton = Ti.UI.createButton({
                     title: "Clear"
@@ -493,7 +527,7 @@ function SettingsWindow(title) {
                         options : ['Clear', 'Cancel'],
                         cancel : 1,
                         destructive: 0,
-                        title : 'Remove upload service?'
+                        title : 'Clear upload service setting?'
                     });
 
                     // TODO: add a listener to conditionally act on the response.
@@ -530,86 +564,59 @@ function SettingsWindow(title) {
                         if(row.value == thisRow.value) { thisRow.hasCheck = true; }
                         data.push(thisRow);
                         
-                        if(i == 'fusionTables') {
+                        if (i == 'fusionTables') {
                             Ti.API.log('in fusion tables OAuth');
-                            
-                            // add a custom footer with a descriptive link
-                            //Ti.Platform.openURL('http://support.google.com/fusiontables/answer/2571232/?hl=en');
-                            thisRow.footer = "http://support.google.com/fusiontables/answer/2571232/?hl=en";
-                            
-                            thisRow.addEventListener('click',function(r){
-    
-                                 // ensure logged in:
-                                var acctWin = Ti.UI.createWindow({
-                                    title:'Fusion Tables',
-                                    backgroundColor: '#ccc',
-                                    barColor:orangeColor
-                                });
+
+                            function displayAccountName() {
+                                function displayErrorMessage(e) {
+                                    Titanium.UI.createAlertDialog({
+                                        title : 'Error',
+                                        message : 'Can\'t load user profile.'
+                                    }).show();
+                                    Ti.API.error('RESPONSE: ' + JSON.stringify(e));
+                                };
                                 
-                                var sync = Ti.UI.createButton({
-                                    title : 'Sync'
+                                var xhrList = Ti.Network.createHTTPClient({
+                                    // function called when the response data is available
+                                    onload : function(e) {
+                                        try {
+                                            var resp = JSON.parse(this.responseText);
+                                            // get the name from the profile response. display in alert:
+                                            Ti.UI.createAlertDialog({
+                                                title : 'Authorized',
+                                                message : 'Signed in as: ' + resp.email
+                                            }).show();
+
+                                        } catch(e) {
+                                            displayErrorMessage(e);
+                                        }
+                                    },
+                                    // function called when an error occurs, including a timeout
+                                    onerror : function(e) {
+                                        displayErrorMessage(e);
+                                    },
+                                    timeout : 5000
                                 });
-                                var logout = Ti.UI.createButton({
-                                    title : 'Logout'
+                                xhrList.open("GET", 'https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + googleAuth.getAccessToken());
+                                xhrList.send();
+                            };
+
+                            thisRow.addEventListener('click', function(r) {
+                                // login to Google if not authorized.
+                                // display an alert with the current name.
+                                googleAuth.isAuthorized(function() {
+                                    // already authorized...or after a successful authorization
+                                    Ti.API.debug('Access Token: ' + googleAuth.getAccessToken());
+                                    displayAccountName();
+                                }, function() {
+                                    // not authorized yet.
+                                    Ti.API.debug('Authorize google account...');
+                                    googleAuth.authorize();
                                 });
-                                var table = Titanium.UI.createTableView();
-                                acctWin.add(table);
-                                acctWin.rightNavButton = sync;
-                                //acctWin.leftNavButton = logout;
-                            
-                                logout.addEventListener('click', function() {
-                                    googleAuth.deAuthorize();
-                                    table.setData([]);
-                                });
-                                sync.addEventListener('click', function() {
-                                    Ti.API.info('Authorized: ' + googleAuth.isAuthorized());
-                                    googleAuth.isAuthorized(function() {
-                                        Ti.API.info('Access Token: ' + googleAuth.getAccessToken());
-                                        //empty table view
-                                        table.setData([]);
-                                        var xhrList = Ti.Network.createHTTPClient({
-                                            // function called when the response data is available
-                                            onload : function(e) {
-                                                try {
-                                                    var resp = JSON.parse(this.responseText);
-                                                    for (var i = 0; i < resp.items.length; i++) {
-                                                        // get each of the table names:
-                                                        var name = resp.items[i].name;
-                                                        var row = Ti.UI.createTableViewRow({
-                                                           title: (name) ? name : '(no name)'
-                                                        });
-                                                        table.appendRow(row);
-                                                    }
-                                                } catch(e) {
-                                                    Titanium.UI.createAlertDialog({
-                                                        title : 'Error',
-                                                        message : 'Can\'t load tasks for list' 
-                                                    });
-                                                    Ti.API.error('RESPONSE: '+JSON.stringify(e));
-                                                }
-                                            },
-                                            // function called when an error occurs, including a timeout
-                                            onerror : function(e) {
-                                                Titanium.UI.createAlertDialog({
-                                                    title : 'Error',
-                                                    message : 'Can\'t load tasklists'
-                                                });
-                                                Ti.API.error('HTTP: '+JSON.stringify(e));
-                                            },
-                                            timeout : 5000
-                                        });
-                                        xhrList.open("GET", 'https://www.googleapis.com/fusiontables/v1/tables?access_token=' + googleAuth.getAccessToken());
-                                        xhrList.send();
-                                    }, function() {
-                                        Ti.API.info('Authorize google account...');
-                                        googleAuth.authorize();
-                                    });
-                                });
-                                    
-                                nav.open(acctWin,{animated:true});
-                                
+
                             });
                         }
+
     
                     }
                 }
@@ -656,6 +663,9 @@ function SettingsWindow(title) {
     // set up the settings table rows:
     var inputData = [];
     
+    // only currently including one network service, but attempting to design this system
+    // to accomodate several upload services. api.js will need to be extented
+    // to support each additional service.
     var networkServiceRow = addNetworkRow('Upload Service','uploadService',
     {
         fusionTables:'Google Fusion Tables',
@@ -695,7 +705,7 @@ function SettingsWindow(title) {
     'This application has been released as open source software under the GPLv3. '+
     'Source code is available at: http://github.com/rcarlsen/Mobile-Logger \n\n'+
     'Created by Robert Carlsen in the Interactive Telecommunications Program at New York University.\n\n'+
-    'Google Authentication Module, Copyright 2012 Miroslav Magda. Licensed with GPL/MIT.'
+    'Google Authentication Module, Copyright 2012 Miroslav Magda. Licensed under GPL/MIT.'
     ;
     
     inputData.push(addAboutRow('About Mobile Logger',aboutString));
@@ -715,5 +725,83 @@ function SettingsWindow(title) {
     
     return self;
 }
+
+
+// will attach a new window for debugging the Google auth and display the current Fusion Tables list.
+// needs a window reference for pushing the new view.
+function debugFusionTables(win) {
+    var nav = win;
+    
+    // ensure logged in:
+    var acctWin = Ti.UI.createWindow({
+        title : 'Fusion Tables',
+        backgroundColor : '#ccc',
+        barColor : orangeColor
+    });
+
+    var sync = Ti.UI.createButton({
+        title : 'Sync'
+    });
+    var logout = Ti.UI.createButton({
+        title : 'Logout'
+    });
+    var table = Titanium.UI.createTableView();
+    acctWin.add(table);
+    acctWin.rightNavButton = sync;
+    //acctWin.leftNavButton = logout;
+
+    logout.addEventListener('click', function() {
+        googleAuth.deAuthorize();
+        table.setData([]);
+    });
+    sync.addEventListener('click', function() {
+        Ti.API.info('Authorized: ' + googleAuth.isAuthorized());
+        googleAuth.isAuthorized(function() {
+            Ti.API.info('Access Token: ' + googleAuth.getAccessToken());
+            //empty table view
+            table.setData([]);
+            var xhrList = Ti.Network.createHTTPClient({
+                // function called when the response data is available
+                onload : function(e) {
+                    try {
+                        var resp = JSON.parse(this.responseText);
+                        for (var i = 0; i < resp.items.length; i++) {
+                            // get each of the table names:
+                            var name = resp.items[i].name;
+                            var row = Ti.UI.createTableViewRow({
+                                title : (name) ? name : '(no name)'
+                            });
+                            table.appendRow(row);
+                        }
+                    } catch(e) {
+                        Titanium.UI.createAlertDialog({
+                            title : 'Error',
+                            message : 'Can\'t load tasks for list'
+                        });
+                        Ti.API.error('RESPONSE: ' + JSON.stringify(e));
+                    }
+                },
+                // function called when an error occurs, including a timeout
+                onerror : function(e) {
+                    Titanium.UI.createAlertDialog({
+                        title : 'Error',
+                        message : 'Can\'t load tasklists'
+                    });
+                    Ti.API.error('HTTP: ' + JSON.stringify(e));
+                },
+                timeout : 5000
+            });
+            xhrList.open("GET", 'https://www.googleapis.com/fusiontables/v1/tables?access_token=' + googleAuth.getAccessToken());
+            xhrList.send();
+        }, function() {
+            Ti.API.info('Authorize google account...');
+            googleAuth.authorize();
+        });
+    });
+
+    nav.open(acctWin, {
+        animated : true
+    });
+};
 
 module.exports = SettingsWindow;
