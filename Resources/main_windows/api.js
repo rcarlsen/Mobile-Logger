@@ -118,7 +118,7 @@ function packageFusionTablesRequest(samples, useSQL, tableID) {
         return statements;
     }
     else {
-        return rows.join('\n');
+        return rows.join('\n')+'\n'; // one extra newline for good luck. fixes bug #19
     }
 }
 
