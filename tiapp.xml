@@ -10,7 +10,7 @@
     </deployment-targets>
     <id>net.robertcarlsen.MobileLogger</id>
     <name>MobileLogger</name>
-    <version>1.2.4.beta1</version>
+    <version>1.2.4.beta2</version>
     <publisher>Robert Carlsen</publisher>
     <url>http://robertcarlsen.net</url>
     <description>Log location, heading, speed, altitude, accelerometer, sound level, trip duration and distance.</description>
